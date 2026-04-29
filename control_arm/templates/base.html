@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}PRL — SO-101{% endblock %}</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+
+    <style>
+        /* ── PRL Design System ─────────────────────────────────────────────── */
+        :root {
+            --amber:      #F5A623;
+            --amber-dim:  rgba(245,166,35,0.08);
+            --amber-mid:  rgba(245,166,35,0.18);
+            --amber-bdr:  rgba(245,166,35,0.35);
+            --dm-mono:    'DM Mono', 'JetBrains Mono', monospace;
+            --ibm:        'IBM Plex Sans', 'DM Sans', system-ui, sans-serif;
+            --nav-w:      60px;
+            --nav-exp:    224px;
+            --hdr-h:      48px;
+            --hdr-border: #252A35;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.001ms !important;
+                transition-duration: 0.001ms !important;
+            }
+        }
+
+        body { font-family: var(--ibm); background: var(--bg); }
+
+        /* ── Scrollbar ─────────────────────────────────────────────────────── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+        /* ── Header ────────────────────────────────────────────────────────── */
+        .prl-hdr {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: var(--hdr-h);
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            padding: 0 16px;
+            background: var(--bg2);
+            border-bottom: 1px solid var(--hdr-border);
+            z-index: 200;
+            gap: 16px;
+        }
+
+        .prl-logo {
+            font-family: var(--dm-mono);
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--amber);
+            letter-spacing: 0.04em;
+            border: 1px solid var(--amber-bdr);
+            padding: 5px 9px;
+            line-height: 1;
+            user-select: none;
+            width: fit-content;
+        }
+
+        .prl-conn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: var(--dm-mono);
+            font-size: 11px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .prl-dot {
+            position: relative;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #334155;
+            flex-shrink: 0;
+            transition: background 0.4s;
+        }
+
+        .prl-dot::after {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border-radius: 50%;
+            background: var(--green);
+            opacity: 0;
+            transition: opacity 0.4s;
+        }
+
+        .prl-dot.live { background: var(--green); }
+        .prl-dot.live::after {
+            opacity: 0.2;
+            animation: prl-ring 2.4s ease-in-out infinite;
+        }
+
+        @keyframes prl-ring {
+            0%, 100% { transform: scale(1); opacity: 0.2; }
+            60%       { transform: scale(2.2); opacity: 0; }
+        }
+
+        #prl-label { color: var(--text-secondary); }
+
+        #prl-port {
+            font-family: var(--dm-mono);
+            font-size: 11px;
+            padding: 2px 7px;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            color: var(--text-dim);
+            transition: color 0.3s, border-color 0.3s;
+        }
+
+        #prl-port.live { color: var(--green); border-color: rgba(16,185,129,0.25); }
+
+        .prl-hdr-right {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .prl-ibtn {
+            width: 30px; height: 30px;
+            display: flex; align-items: center; justify-content: center;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 5px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.15s;
+            text-decoration: none;
+            font-family: var(--dm-mono);
+            font-size: 10px;
+            font-weight: 500;
+            padding: 0;
+        }
+
+        .prl-ibtn:hover {
+            background: var(--bg3);
+            border-color: var(--border);
+            color: var(--text);
+        }
+
+        .prl-ibtn svg {
+            width: 15px; height: 15px;
+            stroke: currentColor; fill: none;
+            stroke-width: 1.75;
+            stroke-linecap: round; stroke-linejoin: round;
+        }
+
+        .prl-ibtn.spinning svg { animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .prl-sep { width: 1px; height: 18px; background: var(--border); }
+
+        /* ── Sidebar Nav ───────────────────────────────────────────────────── */
+        .prl-nav {
+            position: fixed;
+            left: 0; top: var(--hdr-h); bottom: 0;
+            width: var(--nav-w);
+            background: var(--bg2);
+            border-right: 1px solid var(--hdr-border);
+            z-index: 150;
+            overflow: hidden;
+            transition: width 0.22s cubic-bezier(0.16,1,0.3,1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .prl-nav:hover, .prl-nav:focus-within { width: var(--nav-exp); }
+
+        .prl-nav ul { list-style: none; padding: 10px 0; flex: 1; }
+
+        .prl-nlink {
+            display: flex;
+            align-items: center;
+            height: 42px;
+            text-decoration: none;
+            color: var(--text-muted);
+            font-family: var(--ibm);
+            font-size: 13px;
+            font-weight: 400;
+            white-space: nowrap;
+            border-left: 3px solid transparent;
+            transition: color 0.15s, background 0.15s, border-color 0.15s;
+            cursor: pointer;
+            background: none;
+            width: 100%;
+            border-top: none; border-right: none; border-bottom: none;
+            padding: 0;
+        }
+
+        .prl-nlink:hover { background: rgba(255,255,255,0.03); color: var(--text-secondary); }
+
+        .prl-nlink.active {
+            color: var(--amber);
+            border-left-color: var(--amber);
+            background: var(--amber-dim);
+            font-weight: 500;
+        }
+
+        .prl-nlink.active .prl-nico svg { stroke: var(--amber); }
+
+        .prl-nico {
+            width: var(--nav-w);
+            height: 42px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .prl-nico svg {
+            width: 17px; height: 17px;
+            stroke: currentColor; fill: none;
+            stroke-width: 1.75;
+            stroke-linecap: round; stroke-linejoin: round;
+        }
+
+        .prl-nlabel {
+            opacity: 0;
+            transform: translateX(-6px);
+            transition: opacity 0.16s 0.04s, transform 0.16s 0.04s;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .prl-nav:hover .prl-nlabel,
+        .prl-nav:focus-within .prl-nlabel {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .prl-nkbd {
+            font-family: var(--dm-mono);
+            font-size: 9px;
+            color: var(--text-dim);
+            background: var(--bg4);
+            border: 1px solid var(--border);
+            padding: 1px 5px;
+            border-radius: 3px;
+            margin-right: 12px;
+            flex-shrink: 0;
+            opacity: 0;
+            transition: opacity 0.16s 0.04s;
+        }
+
+        .prl-nav:hover .prl-nkbd,
+        .prl-nav:focus-within .prl-nkbd { opacity: 1; }
+
+        .prl-nbadge {
+            display: inline-block;
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: #334155;
+            margin-left: 6px;
+            vertical-align: middle;
+            flex-shrink: 0;
+            transition: background 0.3s, box-shadow 0.3s;
+        }
+
+        .prl-nbadge.live {
+            background: var(--green);
+            box-shadow: 0 0 5px rgba(16,185,129,0.6);
+        }
+
+        /* ── Shell ─────────────────────────────────────────────────────────── */
+        .prl-shell {
+            padding-top: var(--hdr-h);
+            padding-left: var(--nav-w);
+            min-height: 100vh;
+        }
+
+        /* ── Toasts ────────────────────────────────────────────────────────── */
+        #prl-toasts {
+            position: fixed;
+            bottom: 20px; right: 20px;
+            z-index: 9999;
+            display: flex; flex-direction: column; gap: 8px;
+            pointer-events: none;
+        }
+
+        .prl-toast {
+            font-family: var(--dm-mono);
+            font-size: 11px;
+            color: var(--text);
+            background: #151A24;
+            border: 1px solid var(--border2);
+            border-left: 3px solid var(--border2);
+            padding: 9px 14px;
+            border-radius: 3px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.7);
+            animation: prl-tin 0.18s ease;
+            max-width: 300px;
+        }
+
+        .prl-toast.ok   { border-left-color: var(--green); }
+        .prl-toast.err  { border-left-color: var(--red); }
+        .prl-toast.info { border-left-color: var(--amber); }
+
+        @keyframes prl-tin {
+            from { transform: translateY(6px); opacity: 0; }
+            to   { transform: translateY(0);   opacity: 1; }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <a href="/" class="skip-link">Skip to content</a>
+
+    <!-- ── Header ──────────────────────────────────────────────────────────── -->
+    <header class="prl-hdr" role="banner">
+        <div class="prl-logo" aria-label="PARC Robotics Lab">[PRL]</div>
+
+        <div class="prl-conn" role="status" aria-live="polite" aria-atomic="true">
+            <span class="prl-dot" id="prl-dot" aria-hidden="true"></span>
+            <span id="prl-label">SO-101</span>
+            <span id="prl-port" aria-label="Serial port">no device</span>
+        </div>
+
+        <div class="prl-hdr-right">
+            <button class="prl-ibtn" id="prl-disc-btn"
+                    onclick="prlDiscover()"
+                    aria-label="Discover and connect robot"
+                    title="Discover SO-101 (D)">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            </button>
+            <div class="prl-sep" aria-hidden="true"></div>
+            <a href="/settings" class="prl-ibtn"
+               aria-label="Settings"
+               title="Settings (S)">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </a>
+            <div class="prl-sep" aria-hidden="true"></div>
+            <button class="prl-ibtn"
+                    onclick="prlToggleLang()"
+                    id="prl-lang-btn"
+                    aria-label="Switch language"
+                    style="width:auto;padding:0 8px;letter-spacing:0.05em;">{{ lang|upper }}</button>
+        </div>
+    </header>
+
+    <!-- ── Sidebar nav ─────────────────────────────────────────────────────── -->
+    {% set _path = request.path %}
+    <nav class="prl-nav" aria-label="Main navigation">
+        <ul role="list">
+            <li>
+                <a href="/" class="prl-nlink {% if _path == '/' %}active{% endif %}"
+                   aria-label="Dashboard" aria-current="{{ 'page' if _path == '/' else 'false' }}">
+                    <span class="prl-nico" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+                    </span>
+                    <span class="prl-nlabel">Dashboard</span>
+                    <span class="prl-nkbd" aria-hidden="true">H</span>
+                </a>
+            </li>
+            <li>
+                <a href="/learn" class="prl-nlink {% if _path == '/learn' %}active{% endif %}"
+                   aria-label="Learn" aria-current="{{ 'page' if _path == '/learn' else 'false' }}">
+                    <span class="prl-nico" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                    </span>
+                    <span class="prl-nlabel">Learn</span>
+                    <span class="prl-nkbd" aria-hidden="true">L</span>
+                </a>
+            </li>
+            <li>
+                <a href="/practical" class="prl-nlink {% if _path == '/practical' %}active{% endif %}"
+                   aria-label="Practical" aria-current="{{ 'page' if _path == '/practical' else 'false' }}">
+                    <span class="prl-nico" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                    </span>
+                    <span class="prl-nlabel">Practical</span>
+                    <span class="prl-nkbd" aria-hidden="true">P</span>
+                </a>
+            </li>
+            <li>
+                <a href="/play" class="prl-nlink {% if _path == '/play' %}active{% endif %}"
+                   aria-label="Play" aria-current="{{ 'page' if _path == '/play' else 'false' }}">
+                    <span class="prl-nico" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01M17 12h.01"/><path d="M5 10v4M7 12H3"/></svg>
+                    </span>
+                    <span class="prl-nlabel">Play</span>
+                    <span class="prl-nkbd" aria-hidden="true">X</span>
+                </a>
+            </li>
+            <li>
+                <button class="prl-nlink" id="prl-nav-mujoco"
+                        onclick="prlLaunchViewer(event)"
+                        aria-label="Launch MuJoCo viewer">
+                    <span class="prl-nico" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                    </span>
+                    <span class="prl-nlabel">MuJoCo <span class="prl-nbadge" id="prl-vdot"></span></span>
+                    <span class="prl-nkbd" aria-hidden="true">M</span>
+                </button>
+            </li>
+            <li>
+                <a href="/settings" class="prl-nlink {% if _path == '/settings' %}active{% endif %}"
+                   aria-label="Settings" aria-current="{{ 'page' if _path == '/settings' else 'false' }}">
+                    <span class="prl-nico" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    </span>
+                    <span class="prl-nlabel">Settings</span>
+                    <span class="prl-nkbd" aria-hidden="true">S</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- ── Page content ────────────────────────────────────────────────────── -->
+    <div class="prl-shell">
+        {% block content %}{% endblock %}
+    </div>
+
+    <div id="prl-toasts" role="status" aria-live="polite" aria-atomic="false"></div>
+
+    <script>
+        /* ── i18n ──────────────────────────────────────────────────────────── */
+        const _prl_en = {{ en_json|tojson }};
+        const _prl_fr = {{ fr_json|tojson }};
+        let   _prl_lang = '{{ lang }}';
+        window.t = function(k) {
+            const d = _prl_lang === 'fr' ? _prl_fr : _prl_en;
+            return k.split('.').reduce((o,k) => (o||{})[k], d) || k;
+        };
+        window.setLang = function(l) {
+            document.cookie = `lang=${l};path=/;max-age=${60*60*24*365}`;
+            window.location.reload();
+        };
+        function prlToggleLang() {
+            setLang(_prl_lang === 'en' ? 'fr' : 'en');
+        }
+
+        /* ── Toast ─────────────────────────────────────────────────────────── */
+        const PRL = {
+            toast(msg, type='info', ms=3500) {
+                const el = document.createElement('div');
+                el.className = `prl-toast ${type}`;
+                el.textContent = msg;
+                document.getElementById('prl-toasts').appendChild(el);
+                setTimeout(() => el.remove(), ms);
+            }
+        };
+        window.PARC = { Toast: { show: (m, t) => PRL.toast(m, t === 'success' ? 'ok' : t === 'error' ? 'err' : 'info') } };
+
+        /* ── Robot status ──────────────────────────────────────────────────── */
+        const _dot   = document.getElementById('prl-dot');
+        const _port  = document.getElementById('prl-port');
+
+        window.prlSetConnected = function(port) {
+            _dot.classList.add('live');
+            _port.classList.add('live');
+            _port.textContent = port || 'connected';
+        };
+
+        (async () => {
+            try {
+                const d = await (await fetch('/api/status')).json();
+                if (d.connected) prlSetConnected(d.settings?.port);
+            } catch {}
+        })();
+
+        /* ── Discover ──────────────────────────────────────────────────────── */
+        window.prlDiscover = async function() {
+            const btn = document.getElementById('prl-disc-btn');
+            btn.classList.add('spinning');
+            btn.disabled = true;
+            PRL.toast('Scanning for SO-101…', 'info');
+            try {
+                const { ports = [] } = await (await fetch('/api/ports')).json();
+                if (!ports.length) { PRL.toast('No robot ports found', 'err'); }
+                else {
+                    let ok = false;
+                    for (const port of ports) {
+                        try {
+                            const d = await (await fetch('/api/connect', {
+                                method: 'POST',
+                                headers: {'Content-Type':'application/json'},
+                                body: JSON.stringify({port, baudrate:1000000})
+                            })).json();
+                            if (d.ok) { prlSetConnected(port); PRL.toast('Connected — '+port, 'ok'); ok=true; break; }
+                        } catch { continue; }
+                    }
+                    if (!ok) PRL.toast('Ports found, connection failed', 'err');
+                }
+            } catch(e) { PRL.toast('Error: '+e.message, 'err'); }
+            btn.classList.remove('spinning');
+            btn.disabled = false;
+        };
+
+        /* ── MuJoCo viewer ─────────────────────────────────────────────────── */
+        const _vdot = document.getElementById('prl-vdot');
+        let _vrun = false;
+
+        async function prlCheckViewer() {
+            try {
+                const { running } = await (await fetch('/api/viewer/status')).json();
+                _vrun = running;
+                _vdot.classList.toggle('live', running);
+            } catch {}
+        }
+
+        window.prlLaunchViewer = async function(e) {
+            e.preventDefault();
+            if (_vrun) { PRL.toast('Viewer already running', 'info'); return; }
+            PRL.toast('Launching MuJoCo viewer…', 'info');
+            try {
+                const { ok, error } = await (await fetch('/api/viewer/start', {method:'POST'})).json();
+                if (ok) { _vrun = true; _vdot.classList.add('live'); PRL.toast('Viewer launched', 'ok'); }
+                else PRL.toast('Failed: '+(error||'unknown'), 'err');
+            } catch(e) { PRL.toast('Error: '+e, 'err'); }
+        };
+
+        prlCheckViewer();
+        setInterval(prlCheckViewer, 5000);
+
+        /* ── Keyboard shortcuts ────────────────────────────────────────────── */
+        document.addEventListener('keydown', ev => {
+            if (ev.target.matches('input,textarea,select,[contenteditable]')) return;
+            if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+            const map = { h:'/', l:'/learn', p:'/practical', x:'/play', s:'/settings' };
+            const dest = map[ev.key.toLowerCase()];
+            if (dest && dest !== window.location.pathname) { window.location.href = dest; return; }
+            if (ev.key.toLowerCase() === 'm') prlLaunchViewer(ev);
+            if (ev.key.toLowerCase() === 'd') prlDiscover();
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

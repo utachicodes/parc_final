@@ -1,0 +1,356 @@
+{
+  "app": {
+    "title": "PARC ROBOTICS - SO-101 Controller"
+  },
+  "nav": {
+    "back": "Back",
+    "home": "Home"
+  },
+  "landing": {
+    "hero": {
+      "title": "SO-101 Robot Controller",
+      "subtitle": "A powerful 6-DOF robot arm control system with real-time kinematics, AI-assisted programming, and interactive learning modules.",
+      "cta": "Start Learning"
+    }
+  },
+  "gallery": {
+    "label": "Modules",
+    "hint": "Select a module to begin. Each module contains interactive tutorials and practical exercises."
+  },
+  "cards": {
+    "learn": {
+      "title": "Learn",
+      "desc": "Interactive courses covering robotics fundamentals, forward and inverse kinematics, sensor integration, and AI-assisted vision systems. From beginner to advanced level.",
+      "tag1": "Courses",
+      "tag2": "Tutorials"
+    },
+    "practical": {
+      "title": "Practical",
+      "desc": "Hands-on programming environment with Python scripting, block-based code blocks, real-time 3D visualization, robot camera feed, and an AI assistant powered by Llama for guidance.",
+      "tag1": "Coding",
+      "tag2": "AI Assistant"
+    },
+    "play": {
+      "title": "Play",
+      "desc": "Direct robot control interface with joint sliders, preset poses, quick actions, and real-time 3D visualization. Monitor end-effector position and execute pre-built motion modes.",
+      "tag1": "Control",
+      "tag2": "Live View"
+    },
+    "settings": {
+      "title": "Settings",
+      "desc": "Configure application preferences including interface language, color theme, accent colors, notification settings, and system information.",
+      "tag1": "Preferences",
+      "tag2": "System"
+    },
+    "simulator": {
+      "title": "Simulator",
+      "desc": "Launch the MuJoCo 3D simulation environment. Drag joints in the viewer to move the virtual arm and mirror those movements to the physical robot via the bridge.",
+      "tag1": "MuJoCo",
+      "tag2": "3D View"
+    }
+  },
+  "actions": {
+    "explore": "Explore",
+    "open": "Open",
+    "control": "Control",
+    "configure": "Configure",
+    "close": "Close",
+    "confirm": "Confirm",
+    "run": "Run",
+    "launch": "Launch",
+    "starting": "Starting"
+  },
+  "connection": {
+    "title": "Connection",
+    "port": "Serial Port",
+    "port_tip": "Windows: COM21, Linux: /dev/ttyUSB0",
+    "baudrate": "Baudrate",
+    "baud_tip": "Communication speed (default: 1 000 000)",
+    "connect": "Connect",
+    "discover": "Discover Robot",
+    "disconnect": "Disconnect",
+    "status": "Status"
+  },
+  "status": {
+    "connected": "Connected",
+    "not_connected": "Not Connected",
+    "calibrated": "Calibrated",
+    "not_calibrated": "Not Calibrated",
+    "tracking": "Tracking",
+    "no_mode": "No mode selected"
+  },
+  "quick_actions": {
+    "title": "Quick Actions",
+    "home": "Home",
+    "wave": "Wave",
+    "grip": "Grip"
+  },
+  "play": {
+    "title": "Play",
+    "joint_control": "Joint Control",
+    "end_effector": "End Effector Position",
+    "presets": "Presets",
+    "drag_rotate": "Drag to rotate"
+  },
+  "modes": {
+    "title": "Motion Modes",
+    "idle": "Idle",
+    "idle_desc": "Home position",
+    "hello": "Hello",
+    "hello_desc": "Wave gesture x6",
+    "pick_place": "Pick and Place",
+    "pick_place_desc": "Left to right",
+    "dance": "Dance",
+    "dance_desc": "3 x 9 steps",
+    "stretch": "Stretch",
+    "stretch_desc": "8 positions",
+    "salute": "Salute",
+    "salute_desc": "Hold and snap",
+    "shake": "Handshake",
+    "shake_desc": "4 shakes",
+    "run": "Run Mode"
+  },
+  "learn": {
+    "title": "Learn",
+    "hero_title": "Robotics Fundamentals",
+    "hero_subtitle": "Master the principles of robotics, kinematics, and AI with structured courses and hands-on exercises.",
+    "nav": {
+      "beginner": "Beginner",
+      "intermediate": "Intermediate",
+      "advanced": "Advanced"
+    },
+    "module1": {
+      "title": "Introduction to Robotics",
+      "subtitle": "Understanding robot anatomy and control systems"
+    },
+    "module2": {
+      "title": "Kinematics",
+      "subtitle": "Forward and inverse kinematics explained"
+    },
+    "module3": {
+      "title": "AI and Vision",
+      "subtitle": "Integrating AI for autonomous control"
+    },
+    "lesson1_1": {
+      "title": "What is a Robot?",
+      "desc": "Definition, history, and types of robots"
+    },
+    "lesson1_2": {
+      "title": "SO-101 Anatomy",
+      "desc": "Understanding the 6-DOF arm structure"
+    },
+    "lesson1_3": {
+      "title": "Control Systems",
+      "desc": "How motors and servos work together"
+    },
+    "lesson2_1": {
+      "title": "Forward Kinematics",
+      "desc": "Calculating joint positions from angles"
+    },
+    "lesson2_2": {
+      "title": "Inverse Kinematics",
+      "desc": "Finding joint angles from target positions"
+    },
+    "lesson3_1": {
+      "title": "Computer Vision Basics",
+      "desc": "Introduction to image processing"
+    },
+    "lesson3_2": {
+      "title": "MediaPipe Integration",
+      "desc": "Using AI for hand and pose detection"
+    },
+    "progress": "Your Progress",
+    "courses_completed": "Courses Completed",
+    "lessons_completed": "Lessons Completed",
+    "time_spent": "Time Spent",
+    "quick_links": "Quick Links",
+    "glossary": "Glossary",
+    "cheatsheet": "Quick Reference",
+    "documentation": "Full Documentation",
+    "progress_text": "Complete 3 more lessons to unlock the next course",
+    "ai_assistant": "AI Tutor",
+    "ai_desc": "Ask questions about robotics, kinematics, or any topic in this course.",
+    "ai_tutor": "AI Tutor",
+    "ai_tutor_greeting": "Hello! I'm your AI tutor. Ask me anything about robotics, kinematics, programming, or the SO-101 arm.",
+    "ai_tutor_placeholder": "Ask the AI tutor..."
+  },
+  "practical": {
+    "title": "Practical",
+    "code_editor": "Code Editor",
+    "robot_camera": "Robot Camera",
+    "run": "Run Code",
+    "clear": "Clear",
+    "camera_off": "Camera is off",
+    "connect_camera": "Connect Camera",
+    "disconnect_camera": "Disconnect",
+    "analyze_scene": "Analyze Scene",
+    "detect_objects": "Detect Objects",
+    "ai_greeting": "Hello! I am your AI assistant powered by LFM2.5 on your Jetson Orin Nano. Ask me about robotics, Python programming, or the SO-101 arm.",
+    "ai_placeholder": "Ask the AI assistant...",
+    "ai_connecting": "Connecting to AI server...",
+    "ai_offline": "AI server offline",
+    "ai_models": "LFM2.5 Models",
+    "vision": "Vision Analysis",
+    "vision_analyze": "Analyze Scene",
+    "voice_command": "Voice Command",
+"start_recording": "Start Recording",
+    "stop_recording": "Stop Recording",
+    "execute_command": "Execute Command",
+    "voice_settings": "Voice Settings",
+    "voice_language": "Voice Language",
+    "speak_response": "Speak Response",
+    "pieces": "Pieces & Modes",
+    "documentation": "Documentation",
+    "select_piece": "Select a piece to view documentation"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Configure your preferences",
+    "language": "Language",
+    "lang_title": "Interface Language",
+    "lang_desc": "Select your preferred language for the interface",
+    "appearance": "Appearance",
+    "theme_title": "Theme",
+    "theme_desc": "Choose between dark, light, or system theme",
+    "accent_title": "Accent Color",
+    "accent_desc": "Customize the primary accent color",
+    "notifications": "Notifications",
+    "notif_sound": "Sound Effects",
+    "notif_sound_desc": "Play sounds for interactions",
+    "notif_toast": "Toast Notifications",
+    "notif_toast_desc": "Show popup notifications",
+    "about": "About",
+    "version": "Version",
+    "licenses": "Open Source Licenses",
+    "licenses_desc": "View third-party licenses",
+    "workflow_title": "System Architecture",
+    "workflow_desc": "How the AI components work together",
+    "voice_title": "Voice Settings",
+    "voice_desc": "Configure text-to-speech voices and tuning",
+    "back_to_home": "Back to Home",
+    "ai_models_status": "AI Models - Jetson Orin Nano",
+    "loading_status": "Loading model status...",
+    "workflow": {
+      "voice_command": "Voice Command Flow",
+      "vision_analysis": "Vision Analysis Flow",
+      "response_flow": "Response Flow (TTS)",
+      "microphone": "MICROPHONE",
+      "audio_input": "Audio Input",
+      "whisper_cpp": "WHISPER.CPP",
+      "stt": "Speech to Text",
+      "lfm_thinking": "LFM2.5 THINKING",
+      "chat_rag": "Chat + Reasoning",
+      "robot_command": "ROBOT COMMAND",
+      "action": "Action",
+      "camera": "CAMERA",
+      "video_feed": "Video Feed",
+      "yoloe": "YOLOE",
+      "detection": "Object Detection",
+      "lfm_vision": "LFM2.5 VISION",
+      "scene_analysis": "Scene Analysis",
+      "grasp_position": "GRASP POSITION",
+      "coordinates": "Coordinates",
+      "piper": "PIPER",
+      "speaker": "SPEAKER",
+      "audio_out": "Audio Out",
+      "stt_label": "Speech to Text (Whisper.cpp)",
+      "tts_label": "Text to Speech (Piper)",
+      "det_label": "Object Detection (YOLOE)",
+      "rag_label": "AI Chat + Reasoning (LFM2.5)",
+      "server_ports": "Server Ports",
+      "flask_web": "Web UI",
+      "port_5000": "Port 5000 - Main Application"
+    },
+    "voices": {
+      "en_US-lessac-medium": {"name": "Lessac (Medium)", "desc": "English, neutral accent", "lang": "EN"},
+      "en_US-lessac-low": {"name": "Lessac (Low)", "desc": "English, smaller model", "lang": "EN"},
+      "en_GB-alan-medium": {"name": "Alan (UK)", "desc": "British English", "lang": "EN-GB"},
+      "fr_FR-siwis-medium": {"name": "Siwis (Medium)", "desc": "French", "lang": "FR"},
+      "de_DE-karlsson-medium": {"name": "Karlsson (Medium)", "desc": "German", "lang": "DE"},
+      "es_ES-sharvard-medium": {"name": "Sharvard (Medium)", "desc": "Spanish", "lang": "ES"},
+      "it_IT-palia-medium": {"name": "Palia (Medium)", "desc": "Italian", "lang": "IT"}
+    },
+    "voice_preview": "Preview Voice",
+    "voice_test": "Test Voice",
+    "voice_generating": "Generating...",
+    "voice_tuning": "Voice Tuning",
+    "speed": "Speed",
+    "pitch": "Pitch",
+    "volume": "Volume",
+    "ai_status": {
+      "ai_on": "AI:ON",
+      "ai_off": "AI:OFF",
+      "vision_on": "Vision:ON",
+      "vision_off": "Vision:OFF",
+      "stt_on": "STT:ON",
+      "stt_off": "STT:OFF",
+      "tts_on": "TTS:ON",
+      "tts_off": "TTS:OFF",
+      "yoloe": "YOLOE"
+    },
+    "errors": {
+      "tts_unavailable": "TTS unavailable",
+      "failed_to_preview_voice": "Failed to preview voice",
+      "failed_to_download_voice": "Failed to download voice",
+      "connection_failed": "Connection failed",
+      "code_executed_successfully": "Code executed successfully",
+      "failed_to_execute_code": "Failed to execute code",
+      "error_occurred": "Error occurred",
+      "camera_access_denied": "Camera access denied",
+      "camera_not_connected": "Camera not connected",
+      "microphone_access_denied": "Microphone access denied",
+      "target_out_of_reach": "Target out of reach",
+      "ik_solution_applied": "IK solution applied",
+      "robot_reset": "Robot reset to zero position",
+      "connected_to_robot": "Connected to robot",
+      "command_added_to_editor": "Command added to code editor",
+      "voice_downloaded_successfully": "Voice downloaded successfully"
+    },
+    "calibration": {
+      "title": "Servo Calibration",
+      "subtitle": "Calibrate servo positions for accurate robot control",
+      "calibrate": "Auto Calibrate",
+      "calibrating": "Calibrating...",
+      "stop": "Stop",
+      "save": "Save Calibration",
+      "load": "Load Calibration",
+      "reset": "Reset to Center",
+      "servo_limits": "Servo Limits",
+      "min_angle": "Min Angle",
+      "max_angle": "Max Angle",
+      "center_angle": "Center",
+      "connected_required": "Robot must be connected to calibrate",
+      "calibration_complete": "Calibration complete",
+      "calibration_failed": "Calibration failed",
+      "calibration_saved": "Calibration saved",
+      "calibration_loaded": "Calibration loaded",
+      "not_calibrated": "Not calibrated",
+      "calibrated": "Calibrated",
+      "read_hw_limits": "Read HW Limits",
+      "hw_limits": "Hardware Limits",
+      "read_limits": "Read Limits",
+      "sweep_speed": "Sweep Speed",
+      "sweep_acceleration": "Sweep Acceleration"
+    },
+    "tracking": {
+      "title": "Vision Tracking",
+      "face": "Face",
+      "hand": "Hand",
+      "pose": "Pose",
+      "body": "Body",
+      "pose_detail": "Full Body",
+      "stop": "Stop",
+      "inactive": "Tracking: Inactive",
+      "active": "Tracking: {mode} mode",
+      "no_detection": "No {mode} detected",
+      "start_tracking": "Start Tracking"
+    }
+  },
+  "modal": {
+    "licenses_title": "Software License",
+    "licenses_text": "This software is proprietary to PARC ROBOTICS. All rights reserved. Unauthorized copying, distribution, or modification of this software is strictly prohibited."
+  },
+  "footer": {
+    "copyright": "PARC ROBOTICS. All rights reserved. &copy; {year}"
+  }
+}

@@ -1,0 +1,40 @@
+#!/bin/bash
+# Systemd service files for PARC ROBOTICS AI servers
+# Copy these to /etc/systemd/system/ on Jetson Orin Nano
+
+# =============================================================================
+# PARC ROBOTICS - AI Server Services
+# =============================================================================
+
+# Create: sudo cp llama-parc-ai.service /etc/systemd/system/
+# Enable: sudo systemctl daemon-reload && sudo systemctl enable llama-parc-ai
+# Start: sudo systemctl start llama-parc-ai
+# Status: systemctl status llama-parc-ai
+
+[Unit]
+Description=PARC ROBOTICS AI Servers (LFM2.5 + Whisper + Piper)
+After=network.target
+
+[Service]
+Type=simple
+User=parc
+WorkingDirectory=/home/parc/PARC-Remote-Lab
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+Environment="LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
+
+# LFM2.5 Thinking (port 8080)
+ExecStartPre=/bin/sleep 2
+ExecStart=/usr/local/bin/llama-server \
+    -m /home/parc/models/general/lfm2.5-1.2b-thinking-q4_k_m.gguf \
+    -c 2048 -ngl 99 --port 8080 --host 0.0.0.0
+
+# Automatically restart
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=append:/home/parc/logs/llama-ai.log
+StandardError=append:/home/parc/logs/llama-ai.err
+
+[Install]
+WantedBy=multi-user.target

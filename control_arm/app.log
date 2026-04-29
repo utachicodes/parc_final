@@ -1,0 +1,23 @@
+[12:44:29] Loaded translations: ['en', 'fr']
+[12:44:29] Auto-detected port: /dev/ttyACM0
+[12:44:29] Auto-detected camera: 0
+============================================================
+PARC ROBOTICS - SO-101 Robot Controller
+============================================================
+Web UI: http://localhost:5000
+AI Assistant: Ensure llama.cpp server is running on port 8080
+============================================================
+ * Serving Flask app 'app'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.1.67:5000
+Press CTRL+C to quit
+127.0.0.1 - - [17/Apr/2026 12:44:40] "GET / HTTP/1.1" 200 -
+[ WARN:0@27.224] global cap_v4l.cpp:914 open VIDEOIO(V4L2:/dev/video1): can't open camera by index
+127.0.0.1 - - [17/Apr/2026 12:44:56] "POST /gripper_cam/start HTTP/1.1" 200 -
+127.0.0.1 - - [17/Apr/2026 12:45:44] "GET /play HTTP/1.1" 200 -
+127.0.0.1 - - [17/Apr/2026 12:45:44] "GET /static/js/animations.js HTTP/1.1" 304 -
+127.0.0.1 - - [17/Apr/2026 12:45:44] "GET /static/css/theme.css HTTP/1.1" 304 -
+127.0.0.1 - - [17/Apr/2026 12:45:45] "GET /api/ports HTTP/1.1" 200 -

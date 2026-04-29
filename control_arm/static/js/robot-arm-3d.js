@@ -1,0 +1,1166 @@
+/**
+ * SO-101 Robot Arm 3D Viewer
+ * ==========================
+ * Three.js based visualization for robot simulation
+ * Loads actual STL meshes from SO-101 URDF
+ *
+ * Based on Georgia Tech ECE 4560 SO-101 URDF
+ */
+
+// Robot arm dimensions (from Tucker course - in meters for consistency)
+const SO101_CONFIG = {
+    // Link lengths (in meters - matching Tucker FK)
+    link_lengths: {
+        base_to_j1: 0.0624,   // Base to joint 1
+        j1_to_j2: 0.100,      // Shoulder to elbow (upper arm)
+        j2_to_j3: 0.100,      // Elbow to wrist (lower arm)
+        j3_to_j4: 0.080,      // Wrist length
+        j4_to_j5: 0.050,      // Wrist roll length
+        j5_to_gripper: 0.050   // Gripper length
+    },
+    // Joint limits (in degrees)
+    joint_limits: {
+        shoulder_pan: { min: -110, max: 110 },
+        shoulder_lift: { min: -100, max: 90 },
+        elbow_flex: { min: -140, max: 140 },
+        wrist_flex: { min: -100, max: 100 },
+        wrist_roll: { min: -150, max: 150 },
+        gripper: { min: 0, max: 60 }
+    },
+    // Colors
+    colors: {
+        base: 0xE8E8E0,        // Off-white for plastic parts
+        link: 0xE8E8E0,        // Off-white for arm links
+        servo: 0x9E9E9E,       // Gray for servo motors
+        gripper: 0x9E9E9E,    // Gray for gripper
+        highlight: 0x00ff88,
+        warning: 0xff4444
+    },
+    // URDF mesh paths
+    meshes: {
+        base: '/static/urdf/assets/base_so101_v2.stl',
+        base_motor_holder: '/static/urdf/assets/base_motor_holder_so101_v1.stl',
+        shoulder_link: '/static/urdf/assets/rotation_pitch_so101_v1.stl',
+        upper_arm: '/static/urdf/assets/upper_arm_so101_v1.stl',
+        lower_arm: '/static/urdf/assets/under_arm_so101_v1.stl',
+        wrist: '/static/urdf/assets/wrist_roll_pitch_so101_v2.stl',
+        gripper_base: '/static/urdf/assets/wrist_roll_follower_so101_v1.stl',
+        gripper_jaw: '/static/urdf/assets/moving_jaw_so101_v1.stl',
+        servo_motor: '/static/urdf/assets/sts3215_03a_v1.stl'
+    }
+};
+
+class RobotArm3D {
+    constructor(container, options = {}) {
+        this.container = container;
+        this.options = {
+            width: options.width || container.clientWidth || 400,
+            height: options.height || container.clientHeight || 400,
+            background: options.background || 0x1a1a2e,
+            showGrid: options.showGrid !== false,
+            showAxes: options.showAxes !== false,
+            enableOrbit: options.enableOrbit !== false,
+            autoRotate: options.autoRotate || false,
+            useMeshes: options.useMeshes !== false  // Load actual STL meshes
+        };
+
+        this.joints = {
+            shoulder_pan: 0,
+            shoulder_lift: 0,
+            elbow_flex: 0,
+            wrist_flex: 0,
+            wrist_roll: 0,
+            gripper: 0
+        };
+
+        this.targetJoints = { ...this.joints };
+        this.meshes = {};
+        this.meshLoader = null;
+        this.isLoading = false;
+        this.loadedCount = 0;
+        this.totalMeshes = 0;
+
+        this._init();
+    }
+
+    _init() {
+        this.scene = null;
+        this.camera = null;
+        this.renderer = null;
+        this.controls = null;
+
+        this.linkMeshes = [];
+        this.jointMeshes = [];
+        this.gripperMeshes = [];
+        this.jointGroups = {};
+
+        this.animationId = null;
+
+        // Vision simulation
+        this.visionCamera = null;
+        this.visionCanvas = null;
+        this.visionRenderer = null;
+        this.simulatedObjects = [];
+    }
+
+    async init() {
+        // Initialize Three.js scene
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(this.options.background);
+
+        // Camera - positioned to view robot arm nicely
+        this.camera = new THREE.PerspectiveCamera(
+            45,
+            this.options.width / this.options.height,
+            0.01,
+            10
+        );
+        this.camera.position.set(0.4, 0.3, 0.4);
+
+        // Renderer
+        try {
+            this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        } catch (e) {
+            console.error('WebGL not supported:', e);
+            this.container.innerHTML = '<div style="color:white;padding:20px;">WebGL non supporté par ce navigateur.<br>Utilisez Chrome ou activez WebGL dans les paramètres.</div>';
+            return false;
+        }
+        if (!this.renderer.capabilities.isWebGL2 && !this.renderer.capabilities.isWebGL) {
+            console.error('WebGL context creation failed');
+            this.container.innerHTML = '<div style="color:white;padding:20px;">WebGL non supporté par ce navigateur.<br>Utilisez Chrome ou activez WebGL dans les paramètres.</div>';
+            return false;
+        }
+        this.renderer.setSize(this.options.width, this.options.height);
+        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.container.appendChild(this.renderer.domElement);
+
+        // Vision simulation camera (like real robot camera)
+        this.visionCamera = new THREE.PerspectiveCamera(60, 640 / 480, 0.01, 2);
+        this.visionCamera.position.set(0.15, 0.15, 0.15);
+        this.visionCamera.lookAt(0, 0.1, 0);
+
+        // Vision canvas for rendering
+        this.visionCanvas = document.createElement('canvas');
+        this.visionCanvas.width = 640;
+        this.visionCanvas.height = 480;
+        this.visionCanvas.style.display = 'none';
+
+        this.visionRenderer = new THREE.WebGLRenderer({
+            canvas: this.visionCanvas,
+            antialias: true
+        });
+        this.visionRenderer.setSize(640, 480);
+        this.visionRenderer.shadowMap.enabled = true;
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        this.scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(0.2, 0.5, 0.3);
+        directionalLight.castShadow = true;
+        this.scene.add(directionalLight);
+
+        // Grid
+        if (this.options.showGrid) {
+            const gridHelper = new THREE.GridHelper(0.5, 20, 0x444444, 0x222222);
+            gridHelper.position.y = -0.01;
+            this.scene.add(gridHelper);
+        }
+
+        // Axes
+        if (this.options.showAxes) {
+            this._createAxes();
+        }
+
+        // Load meshes or create simplified geometry
+        if (this.options.useMeshes) {
+            await this._loadMeshes();
+        } else {
+            this._createSimplifiedArm();
+        }
+
+        // Orbit controls
+        if (this.options.enableOrbit && window.OrbitControls) {
+            this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+            this.controls.enableDamping = true;
+            this.controls.dampingFactor = 0.05;
+            this.controls.target.set(0, 0.15, 0);
+        }
+
+        // Start animation
+        this._animate();
+
+        // Handle resize
+        window.addEventListener('resize', () => this.onResize());
+
+        return this;
+    }
+
+    async _loadMeshes() {
+        if (typeof THREE.STLLoader === 'undefined') {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js';
+            document.head.appendChild(script);
+            await new Promise(resolve => script.onload = resolve);
+        }
+
+        const loader = new THREE.STLLoader();
+        const textureLoader = new THREE.TextureLoader();
+        const baseColor = new THREE.Color(SO101_CONFIG.colors.base);
+        const grayColor = new THREE.Color(SO101_CONFIG.colors.servo);
+
+        // Material for white plastic parts
+        const whitePlastic = new THREE.MeshPhongMaterial({
+            color: baseColor,
+            specular: 0x111111,
+            shininess: 30
+        });
+
+        // Material for metallic gray parts
+        const metalGray = new THREE.MeshPhongMaterial({
+            color: grayColor,
+            specular: 0x333333,
+            shininess: 50
+        });
+
+        // Scale factor: URDF is in meters, we use meters
+        const scale = 1;
+
+        const meshPromises = [];
+
+        // Load base
+        const basePromise = new Promise((resolve) => {
+            loader.load(
+                SO101_CONFIG.meshes.base,
+                (geometry) => {
+                    geometry.scale(scale, scale, scale);
+                    geometry.center();
+                    geometry.rotateX(-Math.PI / 2);
+                    const mesh = new THREE.Mesh(geometry, whitePlastic.clone());
+                    mesh.position.set(0, 0.032, 0);
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    this.scene.add(mesh);
+                    this.meshes.base = mesh;
+                    resolve();
+                },
+                undefined,
+                () => { resolve(); } // Ignore errors, use fallback
+            );
+        });
+        meshPromises.push(basePromise);
+
+        // Load shoulder/motor holder (joint 1 area)
+        const shoulderPromise = new Promise((resolve) => {
+            loader.load(
+                SO101_CONFIG.meshes.shoulder_link,
+                (geometry) => {
+                    geometry.scale(scale, scale, scale);
+                    geometry.center();
+                    geometry.rotateX(-Math.PI / 2);
+                    const mesh = new THREE.Mesh(geometry, metalGray.clone());
+                    mesh.position.set(0, 0.095, 0);
+                    mesh.castShadow = true;
+                    this.scene.add(mesh);
+                    this.meshes.shoulder = mesh;
+                    resolve();
+                },
+                undefined,
+                () => { resolve(); }
+            );
+        });
+        meshPromises.push(shoulderPromise);
+
+        // Create joint hierarchy with loaded meshes
+        await Promise.all(meshPromises);
+
+        // Create simplified but recognizable arm geometry with proper hierarchy
+        this._createJointHierarchy();
+    }
+
+    _createJointHierarchy() {
+        const { colors, link_lengths } = SO101_CONFIG;
+
+        // White plastic material
+        const whitePlastic = new THREE.MeshPhongMaterial({
+            color: colors.base,
+            specular: 0x111111,
+            shininess: 30
+        });
+
+        // Gray metal material
+        const metalGray = new THREE.MeshPhongMaterial({
+            color: colors.servo,
+            specular: 0x333333,
+            shininess: 50
+        });
+
+        // ===== BASE (fixed) =====
+        const baseGroup = new THREE.Group();
+        baseGroup.position.set(0, 0, 0);
+        this.scene.add(baseGroup);
+
+        // Base cylinder
+        const baseGeom = new THREE.CylinderGeometry(0.045, 0.05, 0.04, 32);
+        const baseMesh = new THREE.Mesh(baseGeom, whitePlastic.clone());
+        baseMesh.position.y = 0.02;
+        baseMesh.castShadow = true;
+        baseMesh.receiveShadow = true;
+        baseGroup.add(baseMesh);
+        this.linkMeshes.push(baseMesh);
+
+        // ===== JOINT 1: Shoulder Pan =====
+        const j1Group = new THREE.Group();
+        j1Group.position.set(0, 0.0624, 0);  // Base to j1 offset
+        baseGroup.add(j1Group);
+        this.jointGroups.j1 = j1Group;
+
+        // Shoulder motor (gray cylinder)
+        const shoulderMotorGeom = new THREE.CylinderGeometry(0.025, 0.025, 0.04, 16);
+        const shoulderMotor = new THREE.Mesh(shoulderMotorGeom, metalGray.clone());
+        shoulderMotor.rotation.x = Math.PI / 2;
+        shoulderMotor.position.y = 0.02;
+        j1Group.add(shoulderMotor);
+
+        // ===== LINK 1: Upper Arm =====
+        const link1Group = new THREE.Group();
+        j1Group.add(link1Group);
+
+        // Upper arm box
+        const upperArmGeom = new THREE.BoxGeometry(0.03, link_lengths.j1_to_j2, 0.025);
+        const upperArm = new THREE.Mesh(upperArmGeom, whitePlastic.clone());
+        upperArm.position.y = link_lengths.j1_to_j2 / 2;
+        upperArm.castShadow = true;
+        link1Group.add(upperArm);
+        this.linkMeshes.push(upperArm);
+
+        // ===== JOINT 2: Shoulder Lift (child of j1Group so it rotates with pan) =====
+        const j2Group = new THREE.Group();
+        j2Group.position.y = link_lengths.j1_to_j2;
+        j1Group.add(j2Group);
+        this.jointGroups.j2 = j2Group;
+
+        // Elbow motor
+        const elbowMotorGeom = new THREE.CylinderGeometry(0.022, 0.022, 0.035, 16);
+        const elbowMotor = new THREE.Mesh(elbowMotorGeom, metalGray.clone());
+        elbowMotor.rotation.x = Math.PI / 2;
+        elbowMotor.position.y = 0;
+        j2Group.add(elbowMotor);
+
+        // ===== LINK 2: Lower Arm (child of j2Group) =====
+        const link2Group = new THREE.Group();
+        j2Group.add(link2Group);
+
+        // Lower arm box
+        const lowerArmGeom = new THREE.BoxGeometry(0.025, link_lengths.j2_to_j3, 0.022);
+        const lowerArm = new THREE.Mesh(lowerArmGeom, whitePlastic.clone());
+        lowerArm.position.y = link_lengths.j2_to_j3 / 2;
+        lowerArm.castShadow = true;
+        link2Group.add(lowerArm);
+        this.linkMeshes.push(lowerArm);
+
+        // ===== JOINT 3: Elbow Flex (child of j2Group) =====
+        const j3Group = new THREE.Group();
+        j3Group.position.y = link_lengths.j2_to_j3;
+        j2Group.add(j3Group);
+        this.jointGroups.j3 = j3Group;
+
+        // Wrist motor
+        const wristMotorGeom = new THREE.CylinderGeometry(0.018, 0.018, 0.03, 16);
+        const wristMotor = new THREE.Mesh(wristMotorGeom, metalGray.clone());
+        wristMotor.rotation.x = Math.PI / 2;
+        j3Group.add(wristMotor);
+
+        // ===== LINK 3: Wrist (child of j3Group) =====
+        const link3Group = new THREE.Group();
+        j3Group.add(link3Group);
+
+        // Wrist box
+        const wristGeom = new THREE.BoxGeometry(0.02, link_lengths.j3_to_j4, 0.018);
+        const wrist = new THREE.Mesh(wristGeom, whitePlastic.clone());
+        wrist.position.y = link_lengths.j3_to_j4 / 2;
+        wrist.castShadow = true;
+        link3Group.add(wrist);
+        this.linkMeshes.push(wrist);
+
+        // ===== JOINT 4: Wrist Flex (child of j3Group) =====
+        const j4Group = new THREE.Group();
+        j4Group.position.y = link_lengths.j3_to_j4;
+        j3Group.add(j4Group);
+        this.jointGroups.j4 = j4Group;
+
+        // ===== LINK 4: Gripper Base (child of j4Group) =====
+        const link4Group = new THREE.Group();
+        j4Group.add(link4Group);
+
+        // Gripper base
+        const gripperBaseGeom = new THREE.BoxGeometry(0.025, link_lengths.j4_to_j5, 0.02);
+        const gripperBase = new THREE.Mesh(gripperBaseGeom, metalGray.clone());
+        gripperBase.position.y = link_lengths.j4_to_j5 / 2;
+        gripperBase.castShadow = true;
+        link4Group.add(gripperBase);
+        this.linkMeshes.push(gripperBase);
+
+        // ===== JOINT 5: Wrist Roll (child of j4Group) =====
+        const j5Group = new THREE.Group();
+        j5Group.position.y = link_lengths.j4_to_j5;
+        j4Group.add(j5Group);
+        this.jointGroups.j5 = j5Group;
+
+        // ===== GRIPPER ===== (joint 6 - doesn't affect FK, child of j5Group)
+        const gripperGroup = new THREE.Group();
+        gripperGroup.position.y = 0.025;
+        j5Group.add(gripperGroup);
+
+        // Gripper fingers
+        const fingerGeom = new THREE.BoxGeometry(0.006, 0.04, 0.008);
+        const finger1 = new THREE.Mesh(fingerGeom, metalGray.clone());
+        finger1.position.set(-0.015, 0.02, 0);
+        gripperGroup.add(finger1);
+
+        const finger2 = new THREE.Mesh(fingerGeom, metalGray.clone());
+        finger2.position.set(0.015, 0.02, 0);
+        gripperGroup.add(finger2);
+
+        this.gripperMeshes.push(finger1, finger2);
+        this.jointGroups.j5 = j5Group;
+        this.jointGroups.gripper = gripperGroup;
+    }
+
+    _createSimplifiedArm() {
+        this._createJointHierarchy();
+    }
+
+    _createAxes() {
+        const axisLength = 0.15;
+        const origin = new THREE.Vector3(0, 0, 0);
+
+        const xGeom = new THREE.BufferGeometry().setFromPoints([origin, new THREE.Vector3(axisLength, 0, 0)]);
+        this.scene.add(new THREE.Line(xGeom, new THREE.LineBasicMaterial({ color: 0xff0000 })));
+
+        const yGeom = new THREE.BufferGeometry().setFromPoints([origin, new THREE.Vector3(0, axisLength, 0)]);
+        this.scene.add(new THREE.Line(yGeom, new THREE.LineBasicMaterial({ color: 0x00ff00 })));
+
+        const zGeom = new THREE.BufferGeometry().setFromPoints([origin, new THREE.Vector3(0, 0, axisLength)]);
+        this.scene.add(new THREE.Line(zGeom, new THREE.LineBasicMaterial({ color: 0x0000ff })));
+    }
+
+    /**
+     * Set joint angles (in degrees)
+     * @param {Object} angles - { shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll, gripper }
+     */
+    setJoints(angles) {
+        const degToRad = Math.PI / 180;
+
+        // Convert and clamp joint angles
+        if (angles.shoulder_pan !== undefined) {
+            this.targetJoints.shoulder_pan = this._clamp(angles.shoulder_pan, SO101_CONFIG.joint_limits.shoulder_pan);
+        }
+        if (angles.shoulder_lift !== undefined) {
+            this.targetJoints.shoulder_lift = this._clamp(angles.shoulder_lift, SO101_CONFIG.joint_limits.shoulder_lift);
+        }
+        if (angles.elbow_flex !== undefined) {
+            this.targetJoints.elbow_flex = this._clamp(angles.elbow_flex, SO101_CONFIG.joint_limits.elbow_flex);
+        }
+        if (angles.wrist_flex !== undefined) {
+            this.targetJoints.wrist_flex = this._clamp(angles.wrist_flex, SO101_CONFIG.joint_limits.wrist_flex);
+        }
+        if (angles.wrist_roll !== undefined) {
+            this.targetJoints.wrist_roll = this._clamp(angles.wrist_roll, SO101_CONFIG.joint_limits.wrist_roll);
+        }
+        if (angles.gripper !== undefined) {
+            this.targetJoints.gripper = this._clamp(angles.gripper, SO101_CONFIG.joint_limits.gripper);
+        }
+    }
+
+    _clamp(value, limits) {
+        return Math.max(limits.min, Math.min(limits.max, value));
+    }
+
+    _updateKinematics() {
+        const degToRad = Math.PI / 180;
+        const lerp = 0.15; // Smooth interpolation factor
+
+        // Smooth joint movement
+        for (const joint in this.joints) {
+            this.joints[joint] += (this.targetJoints[joint] - this.joints[joint]) * lerp;
+        }
+
+        if (!this.jointGroups) return;
+
+        // Get joint groups from hierarchy:
+        // j1: shoulder pan (at base)
+        // j2: shoulder lift (at top of link1)
+        // j3: elbow flex (at top of link2)
+        // j4: wrist flex (at top of link3)
+        // j5: wrist roll (at top of link4)
+        // gripper: gripper fingers
+
+        const j1 = this.jointGroups.j1;
+        const j2 = this.jointGroups.j2;
+        const j3 = this.jointGroups.j3;
+        const j4 = this.jointGroups.j4;
+        const j5 = this.jointGroups.j5;
+        const gripper = this.jointGroups.gripper;
+
+        // Apply rotations based on Tucker FK:
+        // Joint 1 (pan): rotates around Z (base rotation)
+        j1.rotation.y = this.joints.shoulder_pan * degToRad;
+
+        // Joint 2 (lift): rotates around X (shoulder elevation)
+        // From Tucker: Rx(-90 - theta2)
+        j2.rotation.x = (-90 - this.joints.shoulder_lift) * degToRad;
+
+        // Joint 3 (elbow): rotates around X (elbow bend)
+        // From Tucker: Rx(90 + theta3)
+        j3.rotation.x = (90 + this.joints.elbow_flex) * degToRad;
+
+        // Joint 4 (wrist flex): rotates around X (wrist pitch)
+        // From Tucker: Rx(-90 - theta4)
+        j4.rotation.x = (-90 - this.joints.wrist_flex) * degToRad;
+
+        // Joint 5 (wrist roll): rotates around Z (wrist rotation)
+        j5.rotation.z = this.joints.wrist_roll * degToRad;
+
+        // Update gripper fingers (open/close based on joint 6)
+        // Gripper open = fingers move apart
+        if (this.gripperMeshes.length >= 2) {
+            const spread = 0.008 + (this.joints.gripper / 60) * 0.015; // 8mm to 23mm
+            this.gripperMeshes[0].position.x = -spread;
+            this.gripperMeshes[1].position.x = spread;
+        }
+    }
+
+    /**
+     * Calculate forward kinematics (returns end effector position in meters)
+     * Uses Tucker course transformation matrices
+     */
+    calculateFK(angles) {
+        if (!angles) angles = this.joints;
+
+        const degToRad = Math.PI / 180;
+        const { link_lengths } = SO101_CONFIG;
+
+        // Helper rotation matrices
+        const Rx = (thetadeg) => {
+            const th = thetadeg * degToRad;
+            const c = Math.cos(th), s = Math.sin(th);
+            return new THREE.Matrix4().set(
+                1, 0, 0, 0,
+                0, c, -s, 0,
+                0, s, c, 0,
+                0, 0, 0, 1
+            );
+        };
+
+        const Rz = (thetadeg) => {
+            const th = thetadeg * degToRad;
+            const c = Math.cos(th), s = Math.sin(th);
+            return new THREE.Matrix4().set(
+                c, -s, 0, 0,
+                s, c, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1
+            );
+        };
+
+        // Base transform (fixed)
+        const g0w = new THREE.Matrix4();
+        g0w.makeRotationFromEuler(new THREE.Euler(Math.PI, 0, 0));
+        g0w.setPosition(0.0388353, 0, 0.0624);
+
+        // Joint 1: Rz(180) @ Rx(180) @ Rz(theta1)
+        const gw1 = Rz(180).multiply(Rx(180)).multiply(Rz(angles.shoulder_pan));
+        gw1.setPosition(0.0388353, 0, 0.0624);
+
+        // Joint 2: Rx(-90 - theta2)
+        const g12 = Rx(-90 - angles.shoulder_lift);
+        g12.setPosition(0, 0, link_lengths.j1_to_j2);
+
+        // Joint 3: Rx(90 + theta3)
+        const g23 = Rx(90 + angles.elbow_flex);
+        g23.setPosition(link_lengths.j2_to_j3, 0, 0);
+
+        // Joint 4: Rx(-90 - theta4)
+        const g34 = Rx(-90 - angles.wrist_flex);
+        g34.setPosition(0, 0, link_lengths.j3_to_j4);
+
+        // Joint 5: Rz(theta5)
+        const g45 = Rz(angles.wrist_roll);
+        g45.setPosition(0, 0, link_lengths.j4_to_j5);
+
+        // Tool: Fixed
+        const g5t = new THREE.Matrix4();
+        g5t.setPosition(0, 0, link_lengths.j5_to_gripper);
+
+        // Chain transformations
+        const g0t = new THREE.Matrix4()
+            .copy(g0w)
+            .multiply(gw1)
+            .multiply(g12)
+            .multiply(g23)
+            .multiply(g34)
+            .multiply(g45)
+            .multiply(g5t);
+
+        const position = new THREE.Vector3();
+        position.setFromMatrixPosition(g0t);
+
+        const rotation = new THREE.Euler();
+        rotation.setFromRotationMatrix(g0t, 'XYZ');
+
+        return {
+            x: position.x,
+            y: position.y,
+            z: position.z,
+            roll: rotation.x,
+            pitch: rotation.y,
+            yaw: rotation.z
+        };
+    }
+
+    /**
+     * Get current end effector position (for play.html UI)
+     */
+    getEndEffectorPosition() {
+        return this.calculateFK(this.joints);
+    }
+
+    /**
+     * Validate if given position is reachable
+     */
+    isReachable(position) {
+        const maxReach = SO101_CONFIG.link_lengths.j1_to_j2 +
+                        SO101_CONFIG.link_lengths.j2_to_j3 +
+                        SO101_CONFIG.link_lengths.j3_to_j4 +
+                        SO101_CONFIG.link_lengths.j4_to_j5;
+
+        const distance = Math.sqrt(position.x ** 2 + position.y ** 2 + (position.z - SO101_CONFIG.link_lengths.base_to_j1) ** 2);
+
+        return distance <= maxReach;
+    }
+
+    /**
+     * Add a cube at specified position (for pick & place simulation)
+     */
+    addCube(position, size = 0.026, color = 0xff4444, name = 'cube') {
+        // Remove existing cube with same name
+        this.removeObject(name);
+
+        const geometry = new THREE.BoxGeometry(size, size, size);
+        const material = new THREE.MeshPhongMaterial({
+            color: color,
+            transparent: true,
+            opacity: 0.8,
+            shininess: 50
+        });
+        const cube = new THREE.Mesh(geometry, material);
+        cube.position.set(position.x, position.z, position.y); // Tucker to Three.js coords
+        cube.castShadow = true;
+        cube.receiveShadow = true;
+        cube.userData.name = name;
+        cube.userData.originalPosition = { ...position };
+
+        this.scene.add(cube);
+        this.cubes = this.cubes || {};
+        this.cubes[name] = cube;
+
+        return cube;
+    }
+
+    /**
+     * Add a sphere marker (for target positions)
+     */
+    addMarker(position, color = 0x00ff88, size = 0.015, name = 'marker') {
+        this.removeObject(name);
+
+        const geometry = new THREE.SphereGeometry(size, 16, 16);
+        const material = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 0.6
+        });
+        const marker = new THREE.Mesh(geometry, material);
+        marker.position.set(position.x, position.z, position.y);
+        marker.userData.name = name;
+
+        this.scene.add(marker);
+        this.markers = this.markers || {};
+        this.markers[name] = marker;
+
+        return marker;
+    }
+
+    /**
+     * Move cube to new position with animation
+     */
+    moveCube(name, targetPosition, duration = 1.0) {
+        const cube = this.cubes ? this.cubes[name] : null;
+        if (!cube) return;
+
+        const startPos = {
+            x: cube.position.x,
+            y: cube.position.y,
+            z: cube.position.z
+        };
+        const endPos = {
+            x: targetPosition.x,
+            y: targetPosition.z,  // Three.js Y = Tucker Z
+            z: targetPosition.y   // Three.js Z = Tucker Y
+        };
+
+        const startTime = performance.now();
+
+        const animate = () => {
+            const elapsed = (performance.now() - startTime) / 1000;
+            const t = Math.min(elapsed / duration, 1);
+
+            // Smooth easing
+            const easeT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+            cube.position.x = startPos.x + (endPos.x - startPos.x) * easeT;
+            cube.position.y = startPos.y + (endPos.y - startPos.y) * easeT;
+            cube.position.z = startPos.z + (endPos.z - startPos.z) * easeT;
+
+            if (t < 1) {
+                requestAnimationFrame(animate);
+            }
+        };
+
+        animate();
+    }
+
+    /**
+     * Add trajectory path visualization
+     */
+    addTrajectoryPath(trajectory, color = 0x00aaff) {
+        this.removeObject('trajectory_path');
+
+        if (!trajectory || trajectory.length < 2) return;
+
+        const points = [];
+        for (const point of trajectory) {
+            const joints = point.joints;
+            const fk = this.calculateFK(joints);
+            if (fk) {
+                points.push(new THREE.Vector3(fk.x, fk.z, fk.y));
+            }
+        }
+
+        if (points.length < 2) return;
+
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const material = new THREE.LineBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 0.7
+        });
+        const line = new THREE.Line(geometry, material);
+        line.userData.name = 'trajectory_path';
+
+        this.scene.add(line);
+        this.trajectoryLine = line;
+    }
+
+    /**
+     * Clear trajectory path visualization
+     */
+    clearTrajectoryPath() {
+        this.removeObject('trajectory_path');
+    }
+
+    /**
+     * Remove object by name
+     */
+    removeObject(name) {
+        const findAndRemove = (obj) => {
+            if (obj.userData && obj.userData.name === name) {
+                this.scene.remove(obj);
+                return true;
+            }
+            return false;
+        };
+
+        if (this.cubes && this.cubes[name]) {
+            this.scene.remove(this.cubes[name]);
+            delete this.cubes[name];
+        }
+        if (this.markers && this.markers[name]) {
+            this.scene.remove(this.markers[name]);
+            delete this.markers[name];
+        }
+    }
+
+    /**
+     * Execute trajectory animation
+     */
+    executeTrajectory(trajectory, onProgress = null, onComplete = null) {
+        if (!trajectory || trajectory.length === 0) {
+            if (onComplete) onComplete();
+            return;
+        }
+
+        this.trajectoryIndex = 0;
+        this.trajectory = trajectory;
+        this.trajectoryCallbacks = { onProgress, onComplete };
+
+        // Add trajectory visualization
+        this.addTrajectoryPath(trajectory);
+
+        this._trajectoryStartTime = performance.now();
+        this.isExecutingTrajectory = true;
+    }
+
+    _updateTrajectory() {
+        if (!this.isExecutingTrajectory || !this.trajectory) return;
+
+        const elapsed = (performance.now() - this._trajectoryStartTime) / 1000;
+        const totalDuration = this.trajectory[this.trajectory.length - 1].time;
+
+        if (elapsed >= totalDuration) {
+            // Trajectory complete
+            const lastPoint = this.trajectory[this.trajectory.length - 1];
+            this.setJoints(lastPoint.joints);
+            this.isExecutingTrajectory = false;
+
+            if (this.trajectoryCallbacks.onComplete) {
+                this.trajectoryCallbacks.onComplete();
+            }
+            return;
+        }
+
+        // Find current segment
+        let segmentStart = this.trajectory[0];
+        let segmentEnd = this.trajectory[1];
+
+        for (let i = 1; i < this.trajectory.length; i++) {
+            if (this.trajectory[i].time > elapsed) {
+                segmentStart = this.trajectory[i - 1];
+                segmentEnd = this.trajectory[i];
+                break;
+            }
+        }
+
+        // Interpolate
+        const segmentDuration = segmentEnd.time - segmentStart.time;
+        const segmentElapsed = elapsed - segmentStart.time;
+        const t = segmentDuration > 0 ? segmentElapsed / segmentDuration : 1;
+
+        // Ease in-out
+        const easeT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+        const interpolatedJoints = {};
+        for (const joint in segmentStart.joints) {
+            const start = segmentStart.joints[joint] || 0;
+            const end = segmentEnd.joints[joint] || 0;
+            interpolatedJoints[joint] = start + (end - start) * easeT;
+        }
+
+        this.setJoints(interpolatedJoints);
+
+        if (this.trajectoryCallbacks.onProgress) {
+            this.trajectoryCallbacks.onProgress({
+                index: this.trajectoryIndex,
+                elapsed,
+                totalDuration,
+                joints: interpolatedJoints
+            });
+        }
+    }
+
+    /**
+     * Add a colored object for vision detection
+     * @param {string} name - Object identifier (e.g., 'red_cube', 'blue_ball')
+     * @param {object} position - {x, y, z} position
+     * @param {string} color - Color name ('red', 'blue', 'green', 'yellow')
+     * @param {string} shape - Shape ('cube', 'cylinder', 'sphere')
+     */
+    addSimulatedObject(name, position, color = 'red', shape = 'cube') {
+        const colorMap = {
+            'red': 0xff4444,
+            'blue': 0x4444ff,
+            'green': 0x44ff44,
+            'yellow': 0xffff44,
+            'black': 0x222222,
+            'white': 0xffffff
+        };
+
+        const colorHex = colorMap[color] || 0xff4444;
+        const objColor = new THREE.Color(colorHex);
+
+        let geometry;
+        const size = 0.025; // 25mm cube
+        if (shape === 'sphere') {
+            geometry = new THREE.SphereGeometry(size * 0.7, 16, 16);
+        } else if (shape === 'cylinder') {
+            geometry = new THREE.CylinderGeometry(size * 0.5, size * 0.5, size * 1.5, 16);
+        } else {
+            geometry = new THREE.BoxGeometry(size, size, size);
+        }
+
+        const material = new THREE.MeshPhongMaterial({
+            color: objColor,
+            shininess: 50
+        });
+
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(position.x, position.z, position.y);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.userData.simulatedObject = true;
+        mesh.userData.objectName = name;
+        mesh.userData.objectColor = color;
+        mesh.userData.objectShape = shape;
+        mesh.userData.originalPosition = { ...position };
+
+        this.scene.add(mesh);
+
+        if (!this.simulatedObjects) this.simulatedObjects = [];
+        this.simulatedObjects.push(mesh);
+
+        return mesh;
+    }
+
+    /**
+     * Update simulated object position
+     */
+    updateSimulatedObject(name, position) {
+        const obj = this.simulatedObjects?.find(o => o.userData.objectName === name);
+        if (obj) {
+            obj.position.set(position.x, position.z, position.y);
+        }
+    }
+
+    /**
+     * Set vision camera position and orientation
+     * @param {object} cameraPose - {x, y, z, rx, ry, rz} camera position and rotation in radians
+     */
+    setVisionCamera(cameraPose) {
+        if (!this.visionCamera) return;
+
+        if (cameraPose.x !== undefined) this.visionCamera.position.x = cameraPose.x;
+        if (cameraPose.y !== undefined) this.visionCamera.position.y = cameraPose.y;
+        if (cameraPose.z !== undefined) this.visionCamera.position.z = cameraPose.z;
+
+        if (cameraPose.rx !== undefined || cameraPose.ry !== undefined || cameraPose.rz !== undefined) {
+            this.visionCamera.rotation.set(
+                cameraPose.rx || 0,
+                cameraPose.ry || 0,
+                cameraPose.rz || 0
+            );
+        } else {
+            this.visionCamera.lookAt(0, 0.1, 0);
+        }
+    }
+
+    /**
+     * Render scene from vision camera perspective
+     * @returns {string} Base64 encoded image
+     */
+    renderVisionFrame() {
+        if (!this.visionRenderer || !this.visionCamera || !this.scene) return null;
+
+        this.visionRenderer.render(this.scene, this.visionCamera);
+        return this.visionCanvas.toDataURL('image/jpeg', 0.8);
+    }
+
+    /**
+     * Get simulated objects with their 3D positions
+     */
+    getSimulatedObjects() {
+        return this.simulatedObjects?.map(obj => ({
+            name: obj.userData.objectName,
+            color: obj.userData.objectColor,
+            shape: obj.userData.objectShape,
+            position: {
+                x: obj.position.x,
+                y: obj.position.z, // Convert back to Tucker coords
+                z: obj.position.y
+            }
+        })) || [];
+    }
+
+    /**
+     * Clear all simulated objects
+     */
+    clearSimulatedObjects() {
+        if (this.simulatedObjects) {
+            for (const obj of this.simulatedObjects) {
+                this.scene.remove(obj);
+            }
+            this.simulatedObjects = [];
+        }
+    }
+
+    /**
+     * Set up pick and place scenario
+     * @param {array} objects - [{name, color, shape, position}]
+     * @param {object} binPosition - {x, y, z} bin position
+     */
+    setupPickAndPlace(objects, binPosition = { x: 0.1, y: 0, z: 0 }) {
+        this.clearSimulatedObjects();
+
+        // Add table surface
+        const tableGeom = new THREE.BoxGeometry(0.3, 0.02, 0.3);
+        const tableMat = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+        const table = new THREE.Mesh(tableGeom, tableMat);
+        table.position.set(0, -0.01, 0);
+        table.receiveShadow = true;
+        this.scene.add(table);
+
+        // Add objects
+        for (const obj of objects) {
+            this.addSimulatedObject(obj.name, obj.position, obj.color, obj.shape);
+        }
+
+        // Add bin
+        const binGeom = new THREE.BoxGeometry(0.08, 0.05, 0.08);
+        const binMat = new THREE.MeshPhongMaterial({ color: 0x444444 });
+        const bin = new THREE.Mesh(binGeom, binMat);
+        bin.position.set(binPosition.x, binPosition.z + 0.025, binPosition.y);
+        bin.receiveShadow = true;
+        bin.userData.simulatedObject = true;
+        bin.userData.objectName = 'bin';
+        bin.userData.objectColor = 'black';
+        bin.userData.objectShape = 'cube';
+        this.scene.add(bin);
+        if (!this.simulatedObjects) this.simulatedObjects = [];
+        this.simulatedObjects.push(bin);
+
+        // Position camera for good view
+        this.setVisionCamera({ x: 0.2, y: 0.2, z: 0.2, rx: -0.5, ry: 0.8, rz: 0 });
+
+        return this.getSimulatedObjects();
+    }
+
+    /**
+     * Execute pick and place with animation
+     * @param {string} objectName - Name of object to pick
+     * @param {object} targetBin - {x, y, z} bin position
+     * @param {function} onGrip - Callback when gripping
+     */
+    async executePickAndPlace(objectName, targetBin, onGrip = null) {
+        const obj = this.simulatedObjects?.find(o => o.userData.objectName === objectName);
+        if (!obj) {
+            console.error('Object not found:', objectName);
+            return false;
+        }
+
+        const startPos = {
+            x: obj.position.x,
+            y: obj.position.z, // Tucker Y
+            z: obj.position.y  // Tucker Z
+        };
+
+        // Animate pick and place
+        const duration = 2000;
+        const startTime = performance.now();
+
+        // Phase 1: Approach
+        await this._animatePickPhase(startPos, 0.05, duration * 0.2);
+
+        // Phase 2: Descend
+        await this._animatePickPhase(startPos, 0, duration * 0.3);
+
+        // Phase 3: Grip
+        if (onGrip) onGrip();
+
+        // Phase 4: Lift
+        await this._animatePickPhase(startPos, 0.05, duration * 0.15);
+
+        // Move object with robot
+        const binTarget = { x: targetBin.x, y: targetBin.y, z: targetBin.z };
+        const animatingObject = obj;
+
+        const moveStart = performance.now();
+        const moveDuration = duration * 0.25;
+
+        const animateMove = () => {
+            const elapsed = performance.now() - moveStart;
+            const t = Math.min(elapsed / moveDuration, 1);
+            const easeT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+            animatingObject.position.x = startPos.x + (binTarget.x - startPos.x) * easeT;
+            animatingObject.position.z = startPos.z + (binTarget.z - startPos.z) * easeT;
+            animatingObject.position.y = 0.05 + (binTarget.z + 0.025 - 0.05) * easeT;
+
+            if (t < 1) {
+                requestAnimationFrame(animateMove);
+            }
+        };
+
+        animateMove();
+        await new Promise(resolve => setTimeout(resolve, duration * 0.25));
+
+        return true;
+    }
+
+    async _animatePickPhase(targetPos, heightOffset, duration) {
+        return new Promise(resolve => {
+            const startTime = performance.now();
+            const startY = this.jointGroups.j1?.position.y || 0;
+
+            const animate = () => {
+                const elapsed = performance.now() - startTime;
+                const t = Math.min(elapsed / duration, 1);
+                const easeT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+                // Update joint positions to approach
+                if (this.jointGroups.j1) {
+                    this.jointGroups.j1.position.y = startY + (heightOffset - startY) * easeT;
+                }
+
+                if (t < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    resolve();
+                }
+            };
+            animate();
+        });
+    }
+
+    _animate() {
+        this.animationId = requestAnimationFrame(() => this._animate());
+
+        this._updateKinematics();
+        this._updateTrajectory();
+
+        if (this.controls) {
+            this.controls.update();
+        }
+
+        this.renderer.render(this.scene, this.camera);
+    }
+
+    onResize() {
+        if (!this.container) return;
+
+        const width = this.container.clientWidth;
+        const height = this.container.clientHeight;
+
+        this.camera.aspect = width / height;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(width, height);
+    }
+
+    dispose() {
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+        }
+
+        if (this.renderer) {
+            this.renderer.dispose();
+            this.container.removeChild(this.renderer.domElement);
+        }
+    }
+}
+
+// Export for use in browser
+if (typeof window !== 'undefined') {
+    window.RobotArm3D = RobotArm3D;
+    window.SO101_CONFIG = SO101_CONFIG;
+}

@@ -1,0 +1,986 @@
+{% extends 'base.html' %}
+{% block title %}Play — PRL{% endblock %}
+{% block extra_css %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+<script src="{{ url_for('static', filename='js/robot-arm-3d.js') }}"></script>
+<style>
+        .play-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr 320px;
+            height: calc(100vh - var(--header-height));
+            overflow: hidden;
+        }
+
+        .sidebar {
+            background: var(--bg2);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border);
+        }
+
+        .sidebar.right {
+            border-right: none;
+            border-left: 1px solid var(--border);
+        }
+
+        .sidebar-section {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-section:last-child {
+            border-bottom: none;
+        }
+
+        .section-title {
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        /* Joint Sliders */
+        .joint-control {
+            margin-bottom: 20px;
+        }
+
+        .joint-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .joint-name {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text);
+        }
+
+        .joint-value {
+            font-family: var(--mono);
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--blue);
+            min-width: 50px;
+            text-align: right;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: var(--bg4);
+            border-radius: 3px;
+            appearance: none;
+            cursor: pointer;
+            accent-color: var(--blue);
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--blue);
+            border: 3px solid var(--bg2);
+            box-shadow: 0 2px 8px var(--blue-glow);
+            cursor: grab;
+        }
+
+        /* Main 3D View */
+        .main-viewer {
+            position: relative;
+            background: radial-gradient(circle at center, #0f172a 0%, var(--bg) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #main-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        #video-feed {
+            display: none;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .tracking-controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .tracking-btn {
+            padding: 8px 12px;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 11px;
+            font-family: var(--mono);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tracking-btn:hover {
+            background: var(--bg4);
+            border-color: var(--blue);
+        }
+
+        .tracking-btn.active {
+            background: var(--blue);
+            border-color: var(--blue);
+            color: white;
+        }
+
+        .view-toggle {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            display: flex;
+            gap: 8px;
+            z-index: 10;
+        }
+
+        .view-toggle button {
+            padding: 6px 12px;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-muted);
+            font-size: 10px;
+            font-family: var(--mono);
+            cursor: pointer;
+        }
+
+        .view-toggle button.active {
+            background: var(--blue);
+            border-color: var(--blue);
+            color: white;
+        }
+
+        .viewer-hud {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            right: 16px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+
+        .hud-tag {
+            padding: 6px 12px;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            border-radius: var(--r);
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+        }
+
+        /* EE Position */
+        .ee-display {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .ee-pos {
+            background: var(--bg4);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            padding: 12px;
+            text-align: center;
+        }
+
+        .ee-pos label {
+            display: block;
+            font-size: 9px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .ee-pos input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: var(--blue);
+            font-family: var(--mono);
+            font-size: 14px;
+            font-weight: 700;
+            text-align: center;
+            outline: none;
+        }
+
+        /* Quick Actions Grid */
+        .quick-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .quick-btn {
+            padding: 12px 8px;
+            background: var(--bg4);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            color: var(--text-muted);
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .quick-btn:hover {
+            background: var(--bg3);
+            color: var(--text);
+            border-color: var(--border2);
+        }
+
+        .quick-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Connection Status */
+        .connection-status {
+            padding: 16px;
+            background: var(--bg3);
+            border-radius: var(--r);
+            margin-bottom: 16px;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .status-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .status-label {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .status-value {
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .status-value.connected { color: var(--green); }
+        .status-value.disconnected { color: var(--red); }
+
+        /* Mode Buttons */
+        .mode-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .mode-btn {
+            padding: 14px 12px;
+            background: var(--bg4);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .mode-btn:hover {
+            border-color: var(--border2);
+            transform: translateY(-2px);
+        }
+
+        .mode-btn h5 {
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+
+        .mode-btn p {
+            font-size: 9px;
+            color: var(--text-muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .play-layout {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr auto;
+            }
+
+            .sidebar {
+                display: none;
+            }
+
+            .sidebar.right {
+                display: none;
+            }
+        }
+    </style>
+    <script>
+        window.__TRANSLATIONS__ = {{ en_json | tojson }};
+        window.__CURRENT_LANG__ = "{{ lang }}";
+    </script>
+{% endblock %}
+{% block content %}
+    <div class="play-layout" style="height:calc(100vh - var(--hdr-h));">
+        <!-- Left Sidebar -->
+        <div class="sidebar">
+            <!-- Connection -->
+            <div class="sidebar-section">
+                <div class="section-title">{{ t('connection.title') }}</div>
+                <div class="connection-status">
+                    <div class="status-row">
+                        <span class="status-label">{{ t('connection.port') }}</span>
+                        <span class="status-value" id="port-status">--</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">{{ t('connection.status') }}</span>
+                        <span class="status-value disconnected" id="conn-status">{{ t('status.not_connected') }}</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">{{ t('connection.port') }}</label>
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" class="form-input" id="port-input" placeholder="/dev/ttyACM0" style="flex:1;">
+                        <button onclick="refreshPorts()" style="padding:0 12px;background:var(--bg3);border:1px solid var(--border);border-radius:4px);cursor:pointer;">⟳</button>
+                    </div>
+                    <select class="form-input" id="port-select" style="margin-top:8px;">
+                        <option value="">-- Detected ports --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">{{ t('connection.baudrate') }}</label>
+                    <select class="form-input" id="baud-select">
+                        <option value="1000000">1 000 000</option>
+                        <option value="115200">115 200</option>
+                    </select>
+                </div>
+                <button class="btn btn-secondary btn-block" id="discover-btn" onclick="discoverAndConnect()">
+                    {{ t('connection.discover') }}
+                </button>
+                <button class="btn btn-success btn-block" id="connect-btn" onclick="toggleConnection()" style="margin-top:8px;">
+                    {{ t('connection.connect') }}
+                </button>
+            </div>
+
+            <!-- Joint Controls -->
+            <div class="sidebar-section">
+                <div class="section-title">{{ t('play.joint_control') }}</div>
+                <div id="joint-controls"></div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="sidebar-section">
+                <div class="section-title">{{ t('quick_actions.title') }}</div>
+                <div class="quick-grid">
+                    <button class="quick-btn" onclick="quickAction('home')">Home</button>
+                    <button class="quick-btn" onclick="quickAction('wave')">Wave</button>
+                    <button class="quick-btn" onclick="quickAction('grip')">Grip</button>
+                    <button class="quick-btn" onclick="quickAction('release')">Release</button>
+                    <button class="quick-btn" onclick="quickAction('ready')">Ready</button>
+                    <button class="quick-btn" onclick="quickAction('sleep')">Sleep</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Viewer -->
+        <div class="main-viewer">
+            <div class="view-toggle">
+                <button id="btn-3d" class="active" onclick="setView('3d')">3D VIEW</button>
+                <button id="btn-camera" onclick="setView('camera')">CAMERA</button>
+            </div>
+            <div id="main-canvas"></div>
+            <img id="video-feed" src="" alt="Camera Feed" style="display:none;" />
+            <div class="viewer-hud">
+                <span class="hud-tag" id="mode-display">FK MODE | DRAG TO ROTATE</span>
+                <span class="hud-tag" id="fps-display">60 FPS</span>
+            </div>
+        </div>
+
+        <!-- Right Sidebar -->
+        <div class="sidebar right">
+            <!-- EE Position -->
+            <div class="sidebar-section">
+                <div class="section-title">{{ t('play.end_effector') }}</div>
+                <div class="ee-display">
+                    <div class="ee-pos">
+                        <label>X (m)</label>
+                        <input type="text" id="ee-x" readonly value="0.000">
+                    </div>
+                    <div class="ee-pos">
+                        <label>Y (m)</label>
+                        <input type="text" id="ee-y" readonly value="0.000">
+                    </div>
+                    <div class="ee-pos">
+                        <label>Z (m)</label>
+                        <input type="text" id="ee-z" readonly value="0.000">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Presets -->
+            <div class="sidebar-section">
+                <div class="section-title">{{ t('play.presets') }}</div>
+                <div class="mode-grid">
+                    <button class="mode-btn" onclick="setPreset('zero')">
+                        <h5>Zero Pose</h5>
+                        <p>All joints at 0</p>
+                    </button>
+                    <button class="mode-btn" onclick="setPreset('standard')">
+                        <h5>Standard</h5>
+                        <p>Ready position</p>
+                    </button>
+                    <button class="mode-btn" onclick="setPreset('forward')">
+                        <h5>Lean Forward</h5>
+                        <p>Reaching pose</p>
+                    </button>
+                    <button class="mode-btn" onclick="setPreset('wave')">
+                        <h5>Wave</h5>
+                        <p>Waving gesture</p>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modes -->
+            <div class="sidebar-section">
+                <div class="section-title">{{ t('modes.title') }}</div>
+                <div class="mode-grid">
+                    <button class="mode-btn" onclick="runMode('idle')">
+                        <h5>{{ t('modes.idle') }}</h5>
+                        <p>{{ t('modes.idle_desc') }}</p>
+                    </button>
+                    <button class="mode-btn" onclick="runMode('hello')">
+                        <h5>{{ t('modes.hello') }}</h5>
+                        <p>{{ t('modes.hello_desc') }}</p>
+                    </button>
+                    <button class="mode-btn" onclick="runMode('pick_place')">
+                        <h5>{{ t('modes.pick_place') }}</h5>
+                        <p>{{ t('modes.pick_place_desc') }}</p>
+                    </button>
+                    <button class="mode-btn" onclick="runMode('dance')">
+                        <h5>{{ t('modes.dance') }}</h5>
+                        <p>{{ t('modes.dance_desc') }}</p>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Vision Tracking -->
+            <div class="sidebar-section">
+                <div class="section-title">{{ t('tracking.title') }}</div>
+                <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">Start camera to enable tracking</p>
+                <div class="tracking-controls">
+                    <button class="tracking-btn" id="btn-face" onclick="startTracking('face')">{{ t('tracking.face') }}</button>
+                    <button class="tracking-btn" id="btn-hand" onclick="startTracking('hand')">{{ t('tracking.hand') }}</button>
+                    <button class="tracking-btn" id="btn-pose" onclick="startTracking('pose')">{{ t('tracking.pose') }}</button>
+                    <button class="tracking-btn" id="btn-body" onclick="startTracking('body')">{{ t('tracking.body') }}</button>
+                    <button class="tracking-btn" id="btn-pose-yolo" onclick="startTracking('pose_yolo')" style="background:#ff8800;border-color:#ff8800;color:white;">YOLO-Pose GPU</button>
+                    <button class="tracking-btn" id="btn-stop" onclick="stopTracking()">{{ t('tracking.stop') }}</button>
+                </div>
+                <div id="tracking-status" style="margin-top:12px;font-size:10px;color:var(--text-muted);">
+                    {{ t('tracking.inactive') }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/animations.js') }}"></script>
+    <script>
+        // State
+        let connected = false;
+        const JOINT_NAMES = ['Pan', 'Lift', 'Elbow', 'Wrist Flex', 'Wrist Roll', 'Gripper'];
+        const LIMITS = [[-110, 110], [-100, 90], [-140, 140], [-100, 100], [-150, 150], [0, 60]];
+        let Q = [0, 0, 0, 0, 0, 0];
+
+        // Language
+        function setLang(lang) {
+            document.cookie = `lang=${lang};path=/;max-age=${60*60*24*365}`;
+            window.location.reload();
+        }
+
+        function t(key) {
+            const trans = window.__TRANSLATIONS__[window.__CURRENT_LANG__] || {};
+            const keys = key.split('.');
+            let val = trans;
+            for (const k of keys) {
+                if (val && typeof val === 'object') val = val[k];
+                else return key;
+            }
+            return typeof val === 'string' ? val : key;
+        }
+
+        // View Toggle
+        function setView(view) {
+            const canvas = document.getElementById('main-canvas');
+            const video = document.getElementById('video-feed');
+            const btn3d = document.getElementById('btn-3d');
+            const btnCamera = document.getElementById('btn-camera');
+            const modeDisplay = document.getElementById('mode-display');
+
+            if (view === 'camera') {
+                canvas.style.display = 'none';
+                video.style.display = 'block';
+                btn3d.classList.remove('active');
+                btnCamera.classList.add('active');
+                modeDisplay.textContent = 'CAMERA MODE | TRACKING ACTIVE';
+                // Use tracking camera feed if tracking is active, otherwise gripper camera
+                const newSrc = currentTracking ? '/video_feed?' + Date.now() : '/gripper_cam/video_feed?' + Date.now();
+                const currentSrc = video.src.split('?')[0];
+                const targetSrc = newSrc.split('?')[0];
+                if (!video.src || currentSrc !== targetSrc) {
+                    video.src = newSrc;
+                }
+                if (!currentTracking) {
+                    fetch('/gripper_cam/start', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({cam_index: 0})
+                    }).catch(e => console.error('Camera start error:', e));
+                }
+            } else {
+                canvas.style.display = 'block';
+                video.style.display = 'none';
+                btn3d.classList.add('active');
+                btnCamera.classList.remove('active');
+                modeDisplay.textContent = 'FK MODE | DRAG TO ROTATE';
+                // Stop gripper camera
+                video.src = '';
+                fetch('/gripper_cam/stop', {method: 'POST'}).catch(e => console.error('Camera stop error:', e));
+            }
+        }
+
+        // Tracking Functions
+        let currentTracking = null;
+        let trackingPollInterval = null;
+
+        async function pollTrackingStatus() {
+            if (!currentTracking) return;
+            try {
+                const resp = await fetch('/api/status');
+                const data = await resp.json();
+                const ts = data.tracker_stats || {};
+                const statusEl = document.getElementById('tracking-status');
+                if (ts.fps !== undefined && ts.fps > 0) {
+                    const detected = ts.detected ? '✓' : '✗';
+                    statusEl.textContent = `${currentTracking.toUpperCase()}: ${ts.fps.toFixed(1)} FPS | ${detected} | Pan:${ts.pan?.toFixed(0)}° Tilt:${ts.tilt?.toFixed(0)}°`;
+                    statusEl.style.color = ts.detected ? '#00ff88' : '#ff8800';
+                } else if (ts.fps === 0) {
+                    statusEl.textContent = `${currentTracking.toUpperCase()}: Camera issue - check connection`;
+                    statusEl.style.color = '#ff4444';
+                }
+            } catch (e) {
+                // Ignore polling errors
+            }
+        }
+
+        async function startTracking(mode) {
+            const statusEl = document.getElementById('tracking-status');
+            const btnFace = document.getElementById('btn-face');
+            const btnHand = document.getElementById('btn-hand');
+            const btnPose = document.getElementById('btn-pose');
+            const btnBody = document.getElementById('btn-body');
+            const btnPoseYolo = document.getElementById('btn-pose-yolo');
+
+            [btnFace, btnHand, btnPose, btnBody, btnPoseYolo].forEach(b => b && b.classList.remove('active'));
+
+            try {
+                const response = await fetch('/api/tracking/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tracking_mode: mode,
+                        cam_index: 0
+                    })
+                });
+
+                if (response.ok) {
+                    currentTracking = mode;
+                    setView('camera');  // Now setView knows currentTracking is set
+                    const activeBtn = document.getElementById('btn-' + mode);
+                    if (activeBtn) activeBtn.classList.add('active');
+                    const modeLabel = mode === 'pose_yolo' ? 'YOLO-POSE GPU' : mode.toUpperCase();
+                    statusEl.textContent = '{{ t('tracking.active') }}'.replace('{mode}', modeLabel);
+                    PARC?.Toast?.show('Tracking started: ' + modeLabel, 'success');
+                    // Start polling tracking status
+                    if (trackingPollInterval) clearInterval(trackingPollInterval);
+                    trackingPollInterval = setInterval(pollTrackingStatus, 500);
+                } else {
+                    statusEl.textContent = 'Error: ' + response.statusText;
+                    PARC?.Toast?.show('Failed to start tracking', 'error');
+                }
+            } catch (e) {
+                statusEl.textContent = 'Error: ' + e.message;
+                PARC?.Toast?.show('Tracking error: ' + e.message, 'error');
+            }
+        }
+
+        async function stopTracking() {
+            const statusEl = document.getElementById('tracking-status');
+            const btns = ['btn-face', 'btn-hand', 'btn-pose', 'btn-body', 'btn-pose-yolo', 'btn-stop'];
+
+            try {
+                await fetch('/api/tracking/stop', { method: 'POST' });
+                currentTracking = null;
+                if (trackingPollInterval) {
+                    clearInterval(trackingPollInterval);
+                    trackingPollInterval = null;
+                }
+                btns.forEach(id => {
+                    const btn = document.getElementById(id);
+                    if (btn) btn.classList.remove('active');
+                });
+                statusEl.textContent = '{{ t('tracking.inactive') }}';
+                statusEl.style.color = '';
+                PARC?.Toast?.show('Tracking stopped', 'success');
+            } catch (e) {
+                statusEl.textContent = 'Error: ' + e.message;
+            }
+        }
+
+        // Initialize Joint Controls
+        function initJointControls() {
+            const container = document.getElementById('joint-controls');
+            container.innerHTML = '';
+            JOINT_NAMES.forEach((name, i) => {
+                container.innerHTML += `
+                    <div class="joint-control">
+                        <div class="joint-header">
+                            <span class="joint-name">${name}</span>
+                            <span class="joint-value" id="val-${i}">0.0</span>
+                        </div>
+                        <input type="range" id="slider-${i}" 
+                            min="${LIMITS[i][0]}" max="${LIMITS[i][1]}" value="0" step="1"
+                            oninput="updateJoint(${i}, this.value)">
+                    </div>
+                `;
+            });
+        }
+
+        function updateJoint(index, value) {
+            Q[index] = parseFloat(value);
+            document.getElementById(`val-${index}`).textContent = value;
+            if (robotViewer) {
+                const angles = {
+                    shoulder_pan: Q[0] || 0,
+                    shoulder_lift: Q[1] || 0,
+                    elbow_flex: Q[2] || 0,
+                    wrist_flex: Q[3] || 0,
+                    wrist_roll: Q[4] || 0,
+                    gripper: Q[5] || 0
+                };
+                robotViewer.setJoints(angles);
+                const ee = robotViewer.getEndEffectorPosition();
+                if (ee) {
+                    document.getElementById('ee-x').value = ee.x.toFixed(3);
+                    document.getElementById('ee-y').value = ee.y.toFixed(3);
+                    document.getElementById('ee-z').value = ee.z.toFixed(3);
+                }
+            }
+            if (connected) {
+                sendPositions();
+            }
+        }
+
+        // 3D Scene using RobotArm3D with STL meshes
+        let robotViewer = null;
+
+        function init3D() {
+            const container = document.getElementById('main-canvas');
+            if (!container) return;
+
+            // Force container size
+            container.style.width = '100%';
+            container.style.height = '100%';
+            container.innerHTML = '';
+
+            console.log('Initializing RobotArm3D, container size:', container.clientWidth, container.clientHeight);
+
+            try {
+                robotViewer = new RobotArm3D(container, {
+                    width: container.clientWidth || 800,
+                    height: container.clientHeight || 600,
+                    showGrid: true,
+                    showAxes: true,
+                    enableOrbit: true,
+                    useMeshes: true  // Load actual STL meshes
+                });
+
+                robotViewer.init().then(() => {
+                    console.log('RobotArm3D initialized successfully');
+                    console.log('Renderer:', robotViewer.renderer);
+                    const canvas = container.querySelector('canvas');
+                    if (canvas) {
+                        canvas.style.width = '100%';
+                        canvas.style.height = '100%';
+                    }
+                    update3DFromJoints();
+                }).catch(e => {
+                    console.error('RobotArm3D init error:', e);
+                    container.innerHTML = '<div style="color:#ff4444;padding:20px;">Error: ' + e.message + '</div>';
+                });
+            } catch (e) {
+                console.error('RobotArm3D error:', e);
+                container.innerHTML = '<div style="color:#ff4444;padding:20px;">WebGL Error: ' + e.message + '</div>';
+            }
+        }
+
+        function update3DFromJoints() {
+            if (!robotViewer) return;
+            const angles = {
+                shoulder_pan: Q[0] || 0,
+                shoulder_lift: Q[1] || 0,
+                elbow_flex: Q[2] || 0,
+                wrist_flex: Q[3] || 0,
+                wrist_roll: Q[4] || 0,
+                gripper: Q[5] || 0
+            };
+            robotViewer.setJoints(angles);
+
+            // Update EE position display
+            const ee = robotViewer.getEndEffectorPosition();
+            if (ee) {
+                document.getElementById('ee-x').value = ee.x.toFixed(3);
+                document.getElementById('ee-y').value = ee.y.toFixed(3);
+                document.getElementById('ee-z').value = ee.z.toFixed(3);
+            }
+
+            // Update FPS counter
+            frameCount++;
+            const now = performance.now();
+            if (now - lastFpsUpdate >= 1000) {
+                const fps = Math.round(frameCount * 1000 / (now - lastFpsUpdate));
+                document.getElementById('fps-display').textContent = fps + ' FPS';
+                frameCount = 0;
+                lastFpsUpdate = now;
+            }
+
+            requestAnimationFrame(update3DFromJoints);
+        }
+
+        let frameCount = 0;
+        let lastFpsUpdate = performance.now();
+
+        // Discover and Auto-Connect
+        async function discoverAndConnect() {
+            const discoverBtn = document.getElementById('discover-btn');
+            const connectBtn = document.getElementById('connect-btn');
+
+            discoverBtn.disabled = true;
+            discoverBtn.textContent = '...';
+            PARC?.Toast?.show('Discovering robot...', 'info');
+
+            try {
+                // Auto-detect ports
+                const portsResp = await fetch('/api/ports');
+                const portsData = await portsResp.json();
+                const ports = portsData.ports || [];
+
+                // Auto-detect cameras
+                const camerasResp = await fetch('/api/cameras');
+                const camerasData = await camerasResp.json();
+                const cameras = camerasData.cameras || [];
+
+                if (ports.length === 0) {
+                    PARC?.Toast?.show('No robot ports found', 'error');
+                    discoverBtn.disabled = false;
+                    discoverBtn.textContent = '{{ t('connection.discover') }}';
+                    return;
+                }
+
+                // Update UI with detected ports
+                const portSelect = document.getElementById('port-select');
+                portSelect.innerHTML = '';
+                ports.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p;
+                    opt.textContent = p;
+                    portSelect.appendChild(opt);
+                });
+                const port = ports[0];
+                document.getElementById('port-input').value = port;
+
+                // Try to connect to each port
+                let connected_robot = false;
+                for (const tryPort of ports) {
+                    try {
+                        const resp = await fetch('/api/connect', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ port: tryPort, baudrate: 1000000 })
+                        });
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            if (data.ok) {
+                                connected_robot = true;
+                                connected = true;
+                                connectBtn.textContent = '{{ t('connection.disconnect') }}';
+                                connectBtn.className = 'btn btn-danger btn-block';
+                                connectBtn.style.marginTop = '8px';
+                                document.getElementById('conn-status').textContent = '{{ t('status.connected') }}';
+                                document.getElementById('conn-status').className = 'status-value connected';
+                                document.getElementById('conn-badge').textContent = 'CONNECTED';
+                                document.getElementById('conn-badge').className = 'badge b-green';
+                                PARC?.Toast?.show(`Robot connected on ${tryPort}`, 'success');
+                                break;
+                            }
+                        }
+                    } catch (e) {
+                        continue;
+                    }
+                }
+
+                if (!connected_robot) {
+                    PARC?.Toast?.show('Found ports but could not connect', 'error');
+                }
+            } catch (e) {
+                PARC?.Toast?.show('Discovery failed: ' + e.message, 'error');
+            }
+
+            discoverBtn.disabled = false;
+            discoverBtn.textContent = '{{ t('connection.discover') }}';
+        }
+
+        // API
+        async function toggleConnection() {
+            const btn = document.getElementById('connect-btn');
+            if (!connected) {
+                btn.disabled = true;
+                btn.textContent = '...';
+                try {
+                    const port = document.getElementById('port-input').value;
+                    const baud = document.getElementById('baud-select').value;
+                    const resp = await fetch('/api/connect', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ port, baudrate: parseInt(baud) })
+                    });
+                    if (resp.ok) {
+                        connected = true;
+                        btn.textContent = '{{ t('connection.disconnect') }}';
+                        btn.className = 'btn btn-danger btn-block';
+                        document.getElementById('conn-status').textContent = '{{ t('status.connected') }}';
+                        document.getElementById('conn-status').className = 'status-value connected';
+                        document.getElementById('conn-badge').textContent = 'CONNECTED';
+                        document.getElementById('conn-badge').className = 'badge b-green';
+                        PARC?.Toast?.show(t('settings.connected_to_robot'), 'success');
+                    }
+                } catch (e) {
+                    PARC?.Toast?.show(t('settings.errors.connection_failed'), 'error');
+                }
+                btn.disabled = false;
+            } else {
+                await fetch('/api/disconnect', { method: 'POST' });
+                connected = false;
+                btn.textContent = '{{ t('connection.connect') }}';
+                btn.className = 'btn btn-success btn-block';
+                document.getElementById('conn-status').textContent = '{{ t('status.not_connected') }}';
+                document.getElementById('conn-status').className = 'status-value disconnected';
+                document.getElementById('conn-badge').textContent = 'DISCONNECTED';
+                document.getElementById('conn-badge').className = 'badge b-red';
+            }
+        }
+
+        function sendPositions() {
+            const angles = {
+                shoulder_pan: Q[0],
+                shoulder_lift: Q[1],
+                elbow_flex: Q[2],
+                wrist_flex: Q[3],
+                wrist_roll: Q[4],
+                gripper: Q[5]
+            };
+            fetch('/api/move_all', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(angles)
+            });
+        }
+
+        function quickAction(action) {
+            fetch('/api/quick_action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action })
+            });
+            PARC?.Toast?.show(`Executing ${action}`, 'info');
+        }
+
+        function setPreset(preset) {
+            const presets = {
+                zero: [0, 0, 0, 0, 0, 0],
+                standard: [0, -30, 60, -30, 0, 0],
+                forward: [0, -60, 90, -30, 0, 0],
+                wave: [0, -20, 45, -25, 30, 0]
+            };
+            if (presets[preset]) {
+                presets[preset].forEach((v, i) => {
+                    Q[i] = v;
+                    document.getElementById(`slider-${i}`).value = v;
+                    document.getElementById(`val-${i}`).textContent = v;
+                });
+                if (connected) sendPositions();
+            }
+        }
+
+        function runMode(mode) {
+            fetch('/api/mode/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode })
+            });
+            PARC?.Toast?.show(`Running ${mode} mode`, 'info');
+        }
+
+        window.addEventListener('load', () => {
+            initJointControls();
+            init3D();
+            refreshPorts();
+        });
+
+        async function refreshPorts() {
+            try {
+                const response = await fetch('/api/ports');
+                const data = await response.json();
+                const ports = data.ports || [];
+                const select = document.getElementById('port-select');
+                select.innerHTML = '<option value="">-- Detected ports --</option>';
+                ports.forEach(port => {
+                    const opt = document.createElement('option');
+                    opt.value = port;
+                    opt.textContent = port;
+                    select.appendChild(opt);
+                });
+                if (ports.length === 1) {
+                    document.getElementById('port-input').value = ports[0];
+                }
+            } catch (e) {
+                console.error('Failed to get ports:', e);
+            }
+        }
+
+        document.getElementById('port-select')?.addEventListener('change', function() {
+            if (this.value) {
+                document.getElementById('port-input').value = this.value;
+            }
+        });
+    </script>
+{% endblock %}

@@ -1,0 +1,356 @@
+{
+  "app": {
+    "title": "PARC ROBOTICS - Controleur SO-101"
+  },
+  "nav": {
+    "back": "Retour",
+    "home": "Accueil"
+  },
+  "landing": {
+    "hero": {
+      "title": "Controleur Robot SO-101",
+      "subtitle": "Un systeme de controle de bras robotique 6-DDL puissant avec cinematique en temps reel, programmation assistee par IA et modules d'apprentissage interactifs.",
+      "cta": "Commencer a Apprendre"
+    }
+  },
+  "gallery": {
+    "label": "Modules",
+    "hint": "Selectionnez un module pour commencer. Chaque module contient des tutoriels interactifs et des exercices pratiques."
+  },
+  "cards": {
+    "learn": {
+      "title": "Apprendre",
+      "desc": "Cours interactifs couvrant les fondamentaux de la robotique, la cinematique avant et inverse, l'integration des capteurs et les systemes de vision assistes par IA. Du niveau debutant a avance.",
+      "tag1": "Cours",
+      "tag2": "Tutoriels"
+    },
+    "practical": {
+      "title": "Pratique",
+      "desc": "Environnement de programmation pratique avec scripts Python, blocs de code visuel, visualisation 3D en temps reel, flux camera du robot et assistant IA equipe de Llama pour vous guider.",
+      "tag1": "Programmation",
+      "tag2": "Assistant IA"
+    },
+    "play": {
+      "title": "Jouer",
+      "desc": "Interface de controle direct du robot avec curseurs articulaires, poses predefinies, actions rapides et visualisation 3D en temps reel. Surveillez la position de l'effecteur et executez des modes de mouvement pre-integres.",
+      "tag1": "Controle",
+      "tag2": "Vue en Direct"
+    },
+    "settings": {
+      "title": "Parametres",
+      "desc": "Configurez les preferences de l'application incluant la langue de l'interface, le theme de couleurs, les couleurs d'accentuation, les notifications et les informations systeme.",
+      "tag1": "Preferences",
+      "tag2": "Systeme"
+    },
+    "simulator": {
+      "title": "Simulateur",
+      "desc": "Lancez l'environnement de simulation 3D MuJoCo. Faites glisser les articulations dans la visionneuse pour deplacer le bras virtuel et reproduire ces mouvements sur le robot physique via le pont.",
+      "tag1": "MuJoCo",
+      "tag2": "Vue 3D"
+    }
+  },
+  "actions": {
+    "explore": "Explorer",
+    "open": "Ouvrir",
+    "control": "Controler",
+    "configure": "Configurer",
+    "close": "Fermer",
+    "confirm": "Confirmer",
+    "run": "Executer",
+    "launch": "Lancer",
+    "starting": "Demarrage"
+  },
+  "connection": {
+    "title": "Connexion",
+    "port": "Port Serie",
+    "port_tip": "Windows: COM21, Linux: /dev/ttyUSB0",
+    "baudrate": "Debit",
+    "baud_tip": "Vitesse de communication (defaut: 1 000 000)",
+    "connect": "Connecter",
+    "discover": "Decouvrir Robot",
+    "disconnect": "Deconnecter",
+    "status": "Statut"
+  },
+  "status": {
+    "connected": "Connecte",
+    "not_connected": "Non Connecte",
+    "calibrated": "Etalonne",
+    "not_calibrated": "Non Etalonne",
+    "tracking": "Suivi",
+    "no_mode": "Aucun mode selectionne"
+  },
+  "quick_actions": {
+    "title": "Actions Rapides",
+    "home": "Maison",
+    "wave": "Agiter",
+    "grip": "Pincer"
+  },
+  "play": {
+    "title": "Jouer",
+    "joint_control": "Controle Articulaire",
+    "end_effector": "Position de l'Effort Terminal",
+    "presets": "Preselections",
+    "drag_rotate": "Glisser pour tourner"
+  },
+  "modes": {
+    "title": "Modes de Mouvement",
+    "idle": "Repos",
+    "idle_desc": "Position de repos",
+    "hello": "Salut",
+    "hello_desc": "Geste d'acclamation x6",
+    "pick_place": "Prendre et Depos",
+    "pick_place_desc": "Gauche a droite",
+    "dance": "Danser",
+    "dance_desc": "3 x 9 etapes",
+    "stretch": "Etirement",
+    "stretch_desc": "8 positions",
+    "salute": "Salut",
+    "salute_desc": "Tenue et claquement",
+    "shake": "Poignee de main",
+    "shake_desc": "4 poignees",
+    "run": "Lancer Mode"
+  },
+  "learn": {
+    "title": "Apprendre",
+    "hero_title": "Fondamentaux de la Robotique",
+    "hero_subtitle": "Maitrisez les principes de la robotique, de la cinematique et de l'IA avec des cours structures et des exercices pratiques.",
+    "nav": {
+      "beginner": "Debutant",
+      "intermediate": "Intermediaire",
+      "advanced": "Avance"
+    },
+    "module1": {
+      "title": "Introduction a la Robotique",
+      "subtitle": "Comprendre l'anatomie du robot et les systemes de controle"
+    },
+    "module2": {
+      "title": "Cinematique",
+      "subtitle": "Explications de la cinematique avant et inverse"
+    },
+    "module3": {
+      "title": "IA et Vision",
+      "subtitle": "Integration de l'IA pour le controle autonome"
+    },
+    "lesson1_1": {
+      "title": "Qu'est-ce qu'un Robot?",
+      "desc": "Definition, histoire et types de robots"
+    },
+    "lesson1_2": {
+      "title": "Anatomie du SO-101",
+      "desc": "Comprendre la structure du bras 6-DDL"
+    },
+    "lesson1_3": {
+      "title": "Systemes de Controle",
+      "desc": "Comment les moteurs et servos fonctionnent ensemble"
+    },
+    "lesson2_1": {
+      "title": "Cinematique Avant",
+      "desc": "Calcul des positions articulaires a partir des angles"
+    },
+    "lesson2_2": {
+      "title": "Cinematique Inverse",
+      "desc": "Trouver les angles articulaires a partir des positions cibles"
+    },
+    "lesson3_1": {
+      "title": "Bases de la Vision par Ordinateur",
+      "desc": "Introduction au traitement d'images"
+    },
+    "lesson3_2": {
+      "title": "Integration MediaPipe",
+      "desc": "Utilisation de l'IA pour la detection des mains et poses"
+    },
+    "progress": "Votre Progression",
+    "courses_completed": "Cours Termines",
+    "lessons_completed": "Lecons Terminees",
+    "time_spent": "Temps Passe",
+    "quick_links": "Liens Rapides",
+    "glossary": "Glossaire",
+    "cheatsheet": "Reference Rapide",
+    "documentation": "Documentation Complete",
+    "progress_text": "Completez 3 lecons supplementaires pour debloquer le cours suivant",
+    "ai_assistant": "Tuteur IA",
+    "ai_desc": "Posez vos questions sur la robotique, la cinematique ou tout sujet de ce cours.",
+    "ai_tutor": "Tuteur IA",
+    "ai_tutor_greeting": "Bonjour! Je suis votre tuteur IA. Posez-moi vos questions sur la robotique, la cinematique, la programmation ou le bras SO-101.",
+    "ai_tutor_placeholder": "Posez une question au tuteur IA..."
+  },
+"practical": {
+    "title": "Pratique",
+    "code_editor": "Editeur de Code",
+    "robot_camera": "Camera du Robot",
+    "run": "Executer le Code",
+    "clear": "Effacer",
+    "camera_off": "Camera eteinte",
+    "connect_camera": "Connecter Camera",
+    "disconnect_camera": "Deconnecter",
+    "analyze_scene": "Analyser la Scene",
+    "detect_objects": "Detecter Objets",
+    "ai_greeting": "Bonjour! Je suis votre assistant IA ejcu par LFM2.5 sur votre Jetson Orin Nano. Posez-moi vos questions sur la robotique, la programmation Python ou le bras SO-101.",
+    "ai_placeholder": "Interrogez l'assistant IA...",
+    "ai_connecting": "Connexion au serveur IA...",
+    "ai_offline": "Serveur IA hors ligne",
+    "ai_models": "Modeles LFM2.5",
+    "vision": "Analyse Vision",
+    "vision_analyze": "Analyser la Scene",
+    "voice_command": "Commande Vocale",
+"start_recording": "Demarrer l'enregistrement",
+    "stop_recording": "Arreter l'enregistrement",
+    "execute_command": "Executer la Commande",
+    "voice_settings": "Parametres Vocaux",
+    "voice_language": "Langue Vocale",
+    "speak_response": "Lire la Reponse",
+    "pieces": "Pieces et Modes",
+    "documentation": "Documentation",
+    "select_piece": "Selectionnez une piece pour voir la documentation"
+  },
+  "settings": {
+    "title": "Parametres",
+    "subtitle": "Configurez vos preferences",
+    "language": "Langue",
+    "lang_title": "Langue de l'Interface",
+    "lang_desc": "Selectionnez votre langue preferee pour l'interface",
+    "appearance": "Apparence",
+    "theme_title": "Theme",
+    "theme_desc": "Choisissez entre le theme sombre, clair ou systeme",
+    "accent_title": "Couleur d'Accentuation",
+    "accent_desc": "Personnalisez la couleur d'accentuation principale",
+    "notifications": "Notifications",
+    "notif_sound": "Effets Sonores",
+    "notif_sound_desc": "Jouer des sons pour les interactions",
+    "notif_toast": "Notifications Toast",
+    "notif_toast_desc": "Afficher les notifications contextuelles",
+    "about": "A Propos",
+    "version": "Version",
+    "licenses": "Licences Open Source",
+    "licenses_desc": "Voir les licences des composants tiers",
+    "workflow_title": "Architecture Systeme",
+    "workflow_desc": "Comment les composants IA fonctionnent ensemble",
+    "voice_title": "Parametres Vocaux",
+    "voice_desc": "Configurer les voix et le reglage TTS",
+    "back_to_home": "Retour a l'Accueil",
+    "ai_models_status": "Modeles IA - Jetson Orin Nano",
+    "loading_status": "Chargement du statut...",
+    "workflow": {
+      "voice_command": "Flux Commande Vocale",
+      "vision_analysis": "Flux Analyse Vision",
+      "response_flow": "Flux Reponse (TTS)",
+      "microphone": "MICROPHONE",
+      "audio_input": "Entree Audio",
+      "whisper_cpp": "WHISPER.CPP",
+      "stt": "Texte vers Parole",
+      "lfm_thinking": "LFM2.5 PENSEE",
+      "chat_rag": "Discussion + Raisonnement",
+      "robot_command": "COMMANDE ROBOT",
+      "action": "Action",
+      "camera": "CAMERA",
+      "video_feed": "Flux Video",
+      "yoloe": "YOLOE",
+      "detection": "Detection d'Objets",
+      "lfm_vision": "LFM2.5 VISION",
+      "scene_analysis": "Analyse de Scene",
+      "grasp_position": "POSITION DE SAISIE",
+      "coordinates": "Coordonnees",
+      "piper": "PIPER",
+      "speaker": "HAUT-PARLEUR",
+      "audio_out": "Sortie Audio",
+      "stt_label": "Reconnaissance Vocale (Whisper.cpp)",
+      "tts_label": "Synthese Vocale (Piper)",
+      "det_label": "Detection d'Objets (YOLOE)",
+      "rag_label": "Discussion IA + Raisonnement (LFM2.5)",
+      "server_ports": "Ports Serveur",
+      "flask_web": "Interface Web",
+      "port_5000": "Port 5000 - Application Principale"
+    },
+    "voices": {
+      "en_US-lessac-medium": {"name": "Lessac (Moyen)", "desc": "Anglais, accent neutre", "lang": "EN"},
+      "en_US-lessac-low": {"name": "Lessac (Bas)", "desc": "Anglais, modele reduit", "lang": "EN"},
+      "en_GB-alan-medium": {"name": "Alan (UK)", "desc": "Anglais britannique", "lang": "EN-GB"},
+      "fr_FR-siwis-medium": {"name": "Siwis (Moyen)", "desc": "Francais", "lang": "FR"},
+      "de_DE-karlsson-medium": {"name": "Karlsson (Moyen)", "desc": "Allemand", "lang": "DE"},
+      "es_ES-sharvard-medium": {"name": "Sharvard (Moyen)", "desc": "Espagnol", "lang": "ES"},
+      "it_IT-palia-medium": {"name": "Palia (Moyen)", "desc": "Italien", "lang": "IT"}
+    },
+    "voice_preview": "Apercu Vocal",
+    "voice_test": "Tester la Voix",
+    "voice_generating": "Generation...",
+    "voice_tuning": "Reglage Vocal",
+    "speed": "Vitesse",
+    "pitch": "Hauteur",
+    "volume": "Volume",
+    "ai_status": {
+      "ai_on": "IA:ON",
+      "ai_off": "IA:OFF",
+      "vision_on": "Vision:ON",
+      "vision_off": "Vision:OFF",
+      "stt_on": "STT:ON",
+      "stt_off": "STT:OFF",
+      "tts_on": "TTS:ON",
+      "tts_off": "TTS:OFF",
+      "yoloe": "YOLOE"
+    },
+    "errors": {
+      "tts_unavailable": "TTS indisponible",
+      "failed_to_preview_voice": "Echec de l'apercu vocal",
+      "failed_to_download_voice": "Echec du telechargement vocal",
+      "connection_failed": "Connexion echouee",
+      "code_executed_successfully": "Code execute avec succes",
+      "failed_to_execute_code": "Echec de l'execution du code",
+      "error_occurred": "Erreur survenue",
+      "camera_access_denied": "Acces camera refuse",
+      "camera_not_connected": "Camera non connectee",
+      "microphone_access_denied": "Acces microphone refuse",
+      "target_out_of_reach": "Cible hors de portee",
+      "ik_solution_applied": "Solution IK appliquee",
+      "robot_reset": "Robot reinitialise a la position zero",
+      "connected_to_robot": "Connecte au robot",
+      "command_added_to_editor": "Commande ajoutee a l'editeur",
+      "voice_downloaded_successfully": "Voix telechargee avec succes"
+    },
+    "calibration": {
+      "title": "Etalonnage des Servos",
+      "subtitle": "Etalonnez les positions des servos pour un controle precis du robot",
+      "calibrate": "Auto Etalonner",
+      "calibrating": "Etalonnage...",
+      "stop": "Arreter",
+      "save": "Sauvegarder l'Etalonnage",
+      "load": "Charger l'Etalonnage",
+      "reset": "Reinitialiser au Centre",
+      "servo_limits": "Limites des Servos",
+      "min_angle": "Angle Min",
+      "max_angle": "Angle Max",
+      "center_angle": "Centre",
+      "connected_required": "Le robot doit etre connecte pour etalonner",
+      "calibration_complete": "Etalonnage termine",
+      "calibration_failed": "Echec de l'etalonnage",
+      "calibration_saved": "Etalonnage sauvegarde",
+      "calibration_loaded": "Etalonnage charge",
+      "not_calibrated": "Non etalonne",
+      "calibrated": "Etalonne",
+      "read_hw_limits": "Lire Limites Mat",
+      "hw_limits": "Limites Materiel",
+      "read_limits": "Lire Limites",
+      "sweep_speed": "Vitesse de Balayage",
+      "sweep_acceleration": "Acceleration de Balayage"
+    },
+    "tracking": {
+      "title": "Suivi Vision",
+      "face": "Visage",
+      "hand": "Main",
+      "pose": "Pose",
+      "body": "Corps",
+      "pose_detail": "Corps Entier",
+      "stop": "Arreter",
+      "inactive": "Suivi: Inactif",
+      "active": "Suivi: mode {mode}",
+      "no_detection": "Pas de {mode} detecte",
+      "start_tracking": "Demarrer le Suivi"
+    }
+  },
+  "modal": {
+    "licenses_title": "Licence Logicielle",
+    "licenses_text": "Ce logiciel est proprietaire de PARC ROBOTICS. Tous droits reserves. La copie, distribution ou modification non autorisee de ce logiciel est strictement interdite."
+  },
+  "footer": {
+    "copyright": "PARC ROBOTICS. Tous droits reserves. &copy; {year}"
+  }
+}

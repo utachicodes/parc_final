@@ -1,0 +1,715 @@
+{% extends 'base.html' %}
+{% block title %}Learn — PRL{% endblock %}
+{% block extra_css %}
+<style>
+        .learn-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        .learn-hero {
+            text-align: center;
+            padding: 60px 20px;
+            margin-bottom: 60px;
+            background: linear-gradient(180deg, var(--bg2) 0%, transparent 100%);
+            border-radius: 16px;
+        }
+
+        .learn-hero h1 {
+            font-size: 36px;
+            margin-bottom: 16px;
+        }
+
+        .learn-hero p {
+            font-size: 16px;
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Course Navigation */
+        .course-nav {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 48px;
+            flex-wrap: wrap;
+        }
+
+        .course-nav-btn {
+            padding: 10px 20px;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            color: var(--text-muted);
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .course-nav-btn:hover {
+            border-color: var(--border2);
+            color: var(--text);
+        }
+
+        .course-nav-btn.active {
+            background: var(--blue-dim);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        /* Course Modules */
+        .course-modules {
+            display: grid;
+            gap: 24px;
+        }
+
+        .module {
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .module-header {
+            padding: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: background 0.2s;
+        }
+
+        .module-header:hover {
+            background: var(--bg4);
+        }
+
+        .module-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .module-num {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--blue-dim);
+            color: var(--blue);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--mono);
+            font-size: 14px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .module-title h3 {
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .module-title p {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .module-toggle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--bg2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            transition: all 0.2s;
+        }
+
+        .module.open .module-toggle {
+            background: var(--blue);
+            color: #fff;
+            transform: rotate(180deg);
+        }
+
+        .module-content {
+            display: none;
+            padding: 0 24px 24px;
+            border-top: 1px solid var(--border);
+        }
+
+        .module.open .module-content {
+            display: block;
+        }
+
+        /* Lesson List */
+        .lesson-list {
+            margin-top: 20px;
+        }
+
+        .lesson {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: var(--bg2);
+            border-radius: var(--r);
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .lesson:hover {
+            background: var(--bg4);
+            transform: translateX(4px);
+        }
+
+        .lesson-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--blue);
+            flex-shrink: 0;
+        }
+
+        .lesson-info {
+            flex: 1;
+        }
+
+        .lesson-info h4 {
+            font-size: 13px;
+            margin-bottom: 2px;
+        }
+
+        .lesson-info p {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .lesson-duration {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            height: 4px;
+            background: var(--bg4);
+            border-radius: 2px;
+            margin-top: 40px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--blue);
+            width: 25%;
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+
+        .progress-text {
+            text-align: center;
+            margin-top: 12px;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Sidebar */
+        .learn-layout {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 40px;
+        }
+
+        @media (max-width: 900px) {
+            .learn-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .learn-sidebar {
+            position: sticky;
+            top: calc(var(--header-height) + 20px);
+            height: fit-content;
+        }
+
+        .sidebar-card {
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .sidebar-card h4 {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-row span:first-child {
+            color: var(--text-muted);
+        }
+
+        .stat-row span:last-child {
+            font-family: var(--mono);
+            color: var(--blue);
+        }
+
+        /* AI Tutor Sidebar */
+        .ai-tutor-panel {
+            position: fixed;
+            right: -420px;
+            top: var(--header-height);
+            width: 400px;
+            height: calc(100vh - var(--header-height));
+            background: var(--bg2);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: right 0.3s ease;
+            z-index: 100;
+        }
+
+        .ai-tutor-panel.open {
+            right: 0;
+        }
+
+        .ai-tutor-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg3);
+        }
+
+        .ai-tutor-header h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+        }
+
+        .ai-tutor-close {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--bg4);
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .ai-tutor-close:hover {
+            border-color: var(--red);
+            color: var(--red);
+        }
+
+        .ai-tutor-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .ai-tutor-messages .chat-message {
+            max-width: 90%;
+            padding: 14px 18px;
+            border-radius: 16px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .ai-tutor-messages .chat-message.user {
+            align-self: flex-end;
+            background: var(--blue-dim);
+            color: var(--blue);
+            border-bottom-right-radius: 4px;
+        }
+
+        .ai-tutor-messages .chat-message.ai {
+            align-self: flex-start;
+            background: var(--bg4);
+            color: var(--text);
+            border-bottom-left-radius: 4px;
+        }
+
+        .ai-tutor-input {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+            background: var(--bg3);
+            display: flex;
+            gap: 10px;
+        }
+
+        .ai-tutor-input input {
+            flex: 1;
+            padding: 12px 16px;
+            background: var(--bg4);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            color: var(--text);
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .ai-tutor-input input:focus {
+            border-color: var(--blue);
+        }
+
+        .ai-tutor-input button {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--blue);
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .ai-tutor-input button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 16px var(--blue-glow);
+        }
+
+        .ai-tutor-toggle {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--blue);
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 20px var(--blue-glow);
+            z-index: 99;
+            transition: all 0.3s;
+        }
+
+        .ai-tutor-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        .ai-tutor-toggle.active {
+            background: var(--bg3);
+            color: var(--text);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+    </style>
+{% endblock %}
+{% block content %}
+<main style="height: calc(100vh - var(--hdr-h)); overflow-y: auto;">
+        <div class="learn-container">
+            <div class="learn-hero">
+                <h1>{{ t('learn.hero_title') }}</h1>
+                <p>{{ t('learn.hero_subtitle') }}</p>
+            </div>
+
+            <div class="course-nav">
+                <button class="course-nav-btn active">{{ t('learn.nav.beginner') }}</button>
+                <button class="course-nav-btn">{{ t('learn.nav.intermediate') }}</button>
+                <button class="course-nav-btn">{{ t('learn.nav.advanced') }}</button>
+            </div>
+
+            <div class="learn-layout">
+                <div class="course-modules">
+                    <!-- Module 1 -->
+                    <div class="module open">
+                        <div class="module-header" onclick="toggleModule(this)">
+                            <div class="module-info">
+                                <div class="module-num">1</div>
+                                <div class="module-title">
+                                    <h3>{{ t('learn.module1.title') }}</h3>
+                                    <p>{{ t('learn.module1.subtitle') }}</p>
+                                </div>
+                            </div>
+                            <div class="module-toggle">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M6 9l6 6 6-6"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="module-content">
+                            <div class="lesson-list">
+                                <div class="lesson">
+                                    <div class="lesson-icon">01</div>
+                                    <div class="lesson-info">
+                                        <h4>{{ t('learn.lesson1_1.title') }}</h4>
+                                        <p>{{ t('learn.lesson1_1.desc') }}</p>
+                                    </div>
+                                    <span class="lesson-duration">15 min</span>
+                                </div>
+                                <div class="lesson">
+                                    <div class="lesson-icon">02</div>
+                                    <div class="lesson-info">
+                                        <h4>{{ t('learn.lesson1_2.title') }}</h4>
+                                        <p>{{ t('learn.lesson1_2.desc') }}</p>
+                                    </div>
+                                    <span class="lesson-duration">20 min</span>
+                                </div>
+                                <div class="lesson">
+                                    <div class="lesson-icon">03</div>
+                                    <div class="lesson-info">
+                                        <h4>{{ t('learn.lesson1_3.title') }}</h4>
+                                        <p>{{ t('learn.lesson1_3.desc') }}</p>
+                                    </div>
+                                    <span class="lesson-duration">25 min</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Module 2 -->
+                    <div class="module">
+                        <div class="module-header" onclick="toggleModule(this)">
+                            <div class="module-info">
+                                <div class="module-num">2</div>
+                                <div class="module-title">
+                                    <h3>{{ t('learn.module2.title') }}</h3>
+                                    <p>{{ t('learn.module2.subtitle') }}</p>
+                                </div>
+                            </div>
+                            <div class="module-toggle">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M6 9l6 6 6-6"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="module-content">
+                            <div class="lesson-list">
+                                <div class="lesson">
+                                    <div class="lesson-icon">01</div>
+                                    <div class="lesson-info">
+                                        <h4>{{ t('learn.lesson2_1.title') }}</h4>
+                                        <p>{{ t('learn.lesson2_1.desc') }}</p>
+                                    </div>
+                                    <span class="lesson-duration">30 min</span>
+                                </div>
+                                <div class="lesson">
+                                    <div class="lesson-icon">02</div>
+                                    <div class="lesson-info">
+                                        <h4>{{ t('learn.lesson2_2.title') }}</h4>
+                                        <p>{{ t('learn.lesson2_2.desc') }}</p>
+                                    </div>
+                                    <span class="lesson-duration">25 min</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Module 3 -->
+                    <div class="module">
+                        <div class="module-header" onclick="toggleModule(this)">
+                            <div class="module-info">
+                                <div class="module-num">3</div>
+                                <div class="module-title">
+                                    <h3>{{ t('learn.module3.title') }}</h3>
+                                    <p>{{ t('learn.module3.subtitle') }}</p>
+                                </div>
+                            </div>
+                            <div class="module-toggle">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M6 9l6 6 6-6"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="module-content">
+                            <div class="lesson-list">
+                                <div class="lesson">
+                                    <div class="lesson-icon">01</div>
+                                    <div class="lesson-info">
+                                        <h4>{{ t('learn.lesson3_1.title') }}</h4>
+                                        <p>{{ t('learn.lesson3_1.desc') }}</p>
+                                    </div>
+                                    <span class="lesson-duration">35 min</span>
+                                </div>
+                                <div class="lesson">
+                                    <div class="lesson-icon">02</div>
+                                    <div class="lesson-info">
+                                        <h4>{{ t('learn.lesson3_2.title') }}</h4>
+                                        <p>{{ t('learn.lesson3_2.desc') }}</p>
+                                    </div>
+                                    <span class="lesson-duration">40 min</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sidebar -->
+                <div class="learn-sidebar">
+                    <div class="sidebar-card">
+                        <h4>{{ t('learn.progress') }}</h4>
+                        <div class="stat-row">
+                            <span>{{ t('learn.courses_completed') }}</span>
+                            <span>1 / 3</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>{{ t('learn.lessons_completed') }}</span>
+                            <span>3 / 8</span>
+                        </div>
+                        <div class="stat-row">
+                            <span>{{ t('learn.time_spent') }}</span>
+                            <span>1h 20m</span>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-card">
+                        <h4>{{ t('learn.quick_links') }}</h4>
+                        <div class="lesson" style="margin-bottom: 8px;">
+                            <div class="lesson-info">
+                                <h4>{{ t('learn.glossary') }}</h4>
+                            </div>
+                        </div>
+                        <div class="lesson" style="margin-bottom: 8px;">
+                            <div class="lesson-info">
+                                <h4>{{ t('learn.cheatsheet') }}</h4>
+                            </div>
+                        </div>
+                        <div class="lesson">
+                            <div class="lesson-info">
+                                <h4>{{ t('learn.documentation') }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+            <div class="progress-text">{{ t('learn.progress_text') }}</div>
+        </div>
+
+        <!-- AI Tutor Panel -->
+        <div class="ai-tutor-panel" id="ai-tutor-panel">
+            <div class="ai-tutor-header">
+                <h3>{{ t('learn.ai_tutor') }}</h3>
+                <button class="ai-tutor-close" onclick="toggleAITutor()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="ai-tutor-messages" id="ai-tutor-messages">
+                <div class="chat-message ai">{{ t('learn.ai_tutor_greeting') }}</div>
+            </div>
+            <div class="ai-tutor-input">
+                <input type="text" id="ai-tutor-input" placeholder="{{ t('learn.ai_tutor_placeholder') }}" onkeydown="handleTutorKey(event)">
+                <button onclick="sendTutorMessage()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <button class="ai-tutor-toggle" id="ai-tutor-toggle" onclick="toggleAITutor()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+            </svg>
+        </button>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/animations.js') }}"></script>
+    <script>
+        function toggleModule(header) {
+            const module = header.closest('.module');
+            module.classList.toggle('open');
+        }
+
+        document.querySelectorAll('.course-nav-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.course-nav-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
+
+        function toggleAITutor() {
+            const panel = document.getElementById('ai-tutor-panel');
+            const toggle = document.getElementById('ai-tutor-toggle');
+            panel.classList.toggle('open');
+            toggle.classList.toggle('active');
+        }
+
+        function handleTutorKey(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                sendTutorMessage();
+            }
+        }
+
+        async function sendTutorMessage() {
+            const input = document.getElementById('ai-tutor-input');
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            const messages = document.getElementById('ai-tutor-messages');
+            messages.innerHTML += `<div class="chat-message user">${msg}</div>`;
+            input.value = '';
+
+            const typing = document.createElement('div');
+            typing.className = 'chat-message ai';
+            typing.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+            messages.appendChild(typing);
+            messages.scrollTop = messages.scrollHeight;
+
+            try {
+                const resp = await fetch('/api/ai/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: msg, context: 'learn', stream: false })
+                });
+                const data = await resp.json();
+                typing.innerHTML = data.response || data.error || 'Error occurred';
+            } catch (e) {
+                typing.innerHTML = 'Failed to connect to AI tutor';
+            }
+        }
+    </script>
+</main>
+{% endblock %}
+</html>

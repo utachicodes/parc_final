@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SO-101 · Kinematics Engine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        /* ==========================================================================
+           3D Visualizer Specific Styles
+           ========================================================================== */
+        
+        .workspace {
+            display: grid;
+            grid-template-columns: var(--sidebar-width) 1fr var(--sidebar-width);
+            height: calc(100vh - var(--header-height));
+            overflow: hidden;
+        }
+
+        .sidebar {
+            background: var(--bg2);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border);
+            scrollbar-width: thin;
+            scrollbar-color: var(--border2) var(--bg2);
+        }
+
+        .sidebar.right {
+            border-right: none;
+            border-left: 1px solid var(--border);
+        }
+
+        .sidebar-section {
+            padding: var(--r-lg);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-section:last-child {
+            border-bottom: none;
+        }
+
+        .section-title {
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: var(--r-md);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .section-title em {
+            font-style: normal;
+            color: var(--text-dim);
+            font-weight: 400;
+        }
+
+        .joint-row {
+            margin-bottom: var(--r-lg);
+        }
+
+        .joint-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--r-sm);
+        }
+
+        .joint-name {
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .joint-value {
+            font-family: var(--mono);
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--blue);
+            min-width: 50px;
+            text-align: right;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: var(--bg4);
+            border-radius: 3px;
+            appearance: none;
+            cursor: pointer;
+            accent-color: var(--blue);
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--blue);
+            border: 3px solid var(--bg2);
+            box-shadow: 0 2px 8px var(--blue-glow);
+            cursor: grab;
+            transition: transform 0.15s var(--ease-out);
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        input[type="range"]::-webkit-slider-thumb:active {
+            cursor: grabbing;
+        }
+
+        .field3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--r-sm);
+        }
+
+        .field2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--r-sm);
+        }
+
+        .num-input {
+            width: 100%;
+            background: var(--bg4);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 12px;
+            padding: var(--r-sm) var(--r-md);
+            text-align: center;
+            outline: none;
+            transition: all 0.15s var(--ease-out);
+        }
+
+        .num-input:focus {
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px var(--blue-glow);
+        }
+
+        .btn-group {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--r-sm);
+        }
+
+        .ik-status {
+            font-family: var(--mono);
+            font-size: 11px;
+            padding: var(--r-sm) var(--r-md);
+            border-radius: var(--r);
+            margin-top: var(--r-md);
+            background: var(--bg4);
+            border: 1px solid var(--border);
+            transition: all 0.3s var(--ease-out);
+        }
+
+        .ik-status.ok {
+            border-color: var(--green);
+            color: var(--green);
+            background: var(--green-dim);
+        }
+
+        .ik-status.err {
+            border-color: var(--red);
+            color: var(--red);
+            background: var(--red-dim);
+        }
+
+        #canvas-wrap {
+            position: relative;
+            background: radial-gradient(circle at center, #0f172a 0%, var(--bg) 100%);
+            overflow: hidden;
+        }
+
+        #renderer {
+            width: 100%;
+            height: 100%;
+        }
+
+        .cv-overlay {
+            position: absolute;
+            bottom: var(--r-lg);
+            left: var(--r-lg);
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--text-dim);
+            background: rgba(0,0,0,0.6);
+            padding: var(--r-sm) var(--r-md);
+            border-radius: var(--r);
+            border: 1px solid var(--border);
+            backdrop-filter: blur(8px);
+            display: flex;
+            gap: var(--r-md);
+        }
+
+        .cv-overlay span {
+            display: flex;
+            align-items: center;
+            gap: var(--r-xs);
+        }
+
+        .cv-overlay .kbd {
+            background: var(--bg3);
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid var(--border2);
+        }
+
+        /* Reset Button */
+        .reset-btn {
+            cursor: pointer;
+            transition: all 0.2s var(--ease-out);
+        }
+
+        .reset-btn:hover {
+            background: var(--red-dim) !important;
+            color: var(--red) !important;
+            border-color: var(--red) !important;
+        }
+
+        /* Canvas hover effect */
+        #canvas-wrap::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), 
+                        rgba(59, 130, 246, 0.05) 0%, 
+                        transparent 50%);
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #canvas-wrap:hover::before {
+            opacity: 1;
+        }
+
+        /* Animations */
+        .sidebar-section {
+            animation: fadeInUp 0.4s var(--ease-out) both;
+        }
+
+        .sidebar-section:nth-child(1) { animation-delay: 0ms; }
+        .sidebar-section:nth-child(2) { animation-delay: 100ms; }
+        .sidebar-section:nth-child(3) { animation-delay: 200ms; }
+
+        .sidebar-section.right:nth-child(1) { animation-delay: 100ms; }
+        .sidebar-section.right:nth-child(2) { animation-delay: 200ms; }
+
+        @media (max-width: 1024px) {
+            .workspace {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr auto;
+            }
+            
+            .sidebar {
+                display: none;
+            }
+            
+            .sidebar.right {
+                display: none;
+            }
+        }
+    </style>
+    <script>
+        window.__TRANSLATIONS__ = {{ en_json | tojson }};
+        window.__CURRENT_LANG__ = "{{ lang }}";
+    </script>
+</head>
+<body>
+    <a href="/" class="skip-link">← Back to Controller</a>
+    
+    <header class="header">
+        <div class="header-title">
+            <div class="icon">🎯</div>
+            <span>KINEMATICS ENGINE</span>
+        </div>
+        <div class="header-controls">
+            <span class="badge b-blue" id="mode-badge">FK ACTIVE</span>
+            <span class="badge b-red reset-btn" onclick="resetAll()">RESET ROBOT</span>
+        </div>
+    </header>
+
+    <div class="workspace">
+        <!-- Left Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-section animate-in-up">
+                <div class="section-title">Manual Joint Control <em>(deg)</em></div>
+                <div id="joint-controls"></div>
+            </div>
+            
+            <div class="sidebar-section animate-in-up">
+                <div class="section-title">Presets</div>
+                <div class="btn-group">
+                    <button class="btn btn-ghost" onclick="setJoints([0,0,0,0,0])">Zero Pose</button>
+                    <button class="btn btn-ghost" onclick="setJoints([0,-45,90,-45,0])">Standard</button>
+                </div>
+            </div>
+            
+            <div class="sidebar-section animate-in-up">
+                <div class="section-title">End-Effector Position</div>
+                <div class="field3">
+                    <input type="text" class="num-input" id="cur-x" readonly placeholder="X">
+                    <input type="text" class="num-input" id="cur-y" readonly placeholder="Y">
+                    <input type="text" class="num-input" id="cur-z" readonly placeholder="Z">
+                </div>
+            </div>
+        </div>
+
+        <!-- 3D Canvas -->
+        <div id="canvas-wrap">
+            <div id="renderer"></div>
+            <div class="cv-overlay">
+                <span><span class="kbd">DRAG</span> Rotate</span>
+                <span><span class="kbd">RIGHT</span> Pan</span>
+                <span><span class="kbd">SCROLL</span> Zoom</span>
+            </div>
+        </div>
+
+        <!-- Right Sidebar -->
+        <div class="sidebar right">
+            <div class="sidebar-section right animate-in-up">
+                <div class="section-title">Inverse Kinematics Target</div>
+                <div class="field3" style="margin-bottom: var(--r-sm);">
+                    <div>
+                        <small style="color: var(--text-muted); font-size: 9px;">X (m)</small>
+                        <input type="number" class="num-input" id="ik-x" value="0.18" step="0.01">
+                    </div>
+                    <div>
+                        <small style="color: var(--text-muted); font-size: 9px;">Y (m)</small>
+                        <input type="number" class="num-input" id="ik-y" value="0.00" step="0.01">
+                    </div>
+                    <div>
+                        <small style="color: var(--text-muted); font-size: 9px;">Z (m)</small>
+                        <input type="number" class="num-input" id="ik-z" value="0.12" step="0.01">
+                    </div>
+                </div>
+                <div style="margin-bottom: var(--r-sm);">
+                    <small style="color: var(--text-muted); font-size: 9px;">Wrist Pitch (deg)</small>
+                    <input type="number" class="num-input" id="ik-pitch" value="0" step="1">
+                </div>
+                <button class="btn btn-primary btn-block" onclick="solveIK()">
+                    ⚡ Compute & Apply IK
+                </button>
+                <div class="ik-status" id="ik-status">Ready — Enter target position</div>
+            </div>
+            
+            <div class="sidebar-section right animate-in-up">
+                <div class="section-title">Robot Dimensions <em>(m)</em></div>
+                <div id="dim-controls"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/animations.js') }}"></script>
+    <script>
+        function t(key) {
+            const trans = window.__TRANSLATIONS__[window.__CURRENT_LANG__] || {};
+            const keys = key.split('.');
+            let val = trans;
+            for (const k of keys) {
+                if (val && typeof val === 'object') val = val[k];
+                else return key;
+            }
+            return typeof val === 'string' ? val : key;
+        }
+
+        /* ==========================================================================
+           SO-101 Kinematics Engine
+           ========================================================================== */
+        
+        const D = {
+            BASE_H: 0.062,
+            UPPER_ARM: 0.112,
+            FORE_ARM: 0.112,
+            WRIST_H: 0.050,
+            TOOL: 0.085
+        };
+
+        const LIMITS = [
+            [-110, 110],
+            [-100, 90],
+            [-140, 140],
+            [-100, 100],
+            [-150, 150]
+        ];
+
+        const JOINT_NAMES = ['Pan', 'Lift', 'Elbow', 'Wrist Flex', 'Wrist Roll'];
+        const JCOLORS = [0x3b82f6, 0x10b981, 0xf97316, 0xf59e0b, 0x8b5cf6];
+
+        let Q = [0, 0, 0, 0, 0];
+        let scene, camera, renderer, links = [], joints = [];
+
+        const d2r = d => d * Math.PI / 180;
+        const r2d = r => r * 180 / Math.PI;
+
+        /* Forward Kinematics */
+        function fk(q) {
+            const rad = q.map(d2r);
+            const frames = [];
+
+            let pos = new THREE.Vector3(0, D.BASE_H, 0);
+            let rot = new THREE.Euler(0, rad[0], 0, 'YXZ');
+            frames.push({ pos: pos.clone(), rot: rot.clone() });
+
+            let m2 = new THREE.Matrix4().makeRotationY(rad[0]);
+            m2.multiply(new THREE.Matrix4().makeTranslation(0, D.BASE_H, 0));
+            m2.multiply(new THREE.Matrix4().makeRotationX(rad[1]));
+            let p2 = new THREE.Vector3().setFromMatrixPosition(m2);
+            frames.push({ pos: p2, matrix: m2.clone() });
+
+            let m3 = m2.clone().multiply(new THREE.Matrix4().makeTranslation(0, D.UPPER_ARM, 0));
+            m3.multiply(new THREE.Matrix4().makeRotationX(rad[2]));
+            frames.push({ pos: new THREE.Vector3().setFromMatrixPosition(m3), matrix: m3.clone() });
+
+            let m4 = m3.clone().multiply(new THREE.Matrix4().makeTranslation(0, D.FORE_ARM, 0));
+            m4.multiply(new THREE.Matrix4().makeRotationX(rad[3]));
+            frames.push({ pos: new THREE.Vector3().setFromMatrixPosition(m4), matrix: m4.clone() });
+
+            let m5 = m4.clone().multiply(new THREE.Matrix4().makeTranslation(0, D.WRIST_H, 0));
+            m5.multiply(new THREE.Matrix4().makeRotationY(rad[4]));
+            frames.push({ pos: new THREE.Vector3().setFromMatrixPosition(m5), matrix: m5.clone() });
+
+            let mT = m5.clone().multiply(new THREE.Matrix4().makeTranslation(0, D.TOOL, 0));
+            frames.push({ pos: new THREE.Vector3().setFromMatrixPosition(mT), matrix: mT.clone() });
+
+            return frames;
+        }
+
+        /* Inverse Kinematics */
+        function solveIK() {
+            const tx = parseFloat(document.getElementById('ik-x').value);
+            const ty = parseFloat(document.getElementById('ik-y').value);
+            const tz = parseFloat(document.getElementById('ik-z').value);
+            const pitch = d2r(parseFloat(document.getElementById('ik-pitch').value) || 0);
+            
+            const status = document.getElementById('ik-status');
+
+            const j1 = Math.atan2(tz, tx);
+            const r = Math.sqrt(tx*tx + tz*tz);
+            const h = ty - D.BASE_H;
+            const L_eff = D.WRIST_H + D.TOOL;
+            const wx = r - Math.cos(pitch) * L_eff;
+            const wy = h - Math.sin(pitch) * L_eff;
+
+            const distSq = wx*wx + wy*wy;
+            const dist = Math.sqrt(distSq);
+            const a = D.UPPER_ARM;
+            const b = D.FORE_ARM;
+
+            const cosJ3 = (distSq - a*a - b*b) / (2 * a * b);
+            
+            if (Math.abs(cosJ3) > 1) {
+                status.innerText = '✗ Target out of reach';
+                status.className = 'ik-status err';
+                PARC?.Toast?.show(t('settings.errors.target_out_of_reach'), 'error');
+                return;
+            }
+
+            const j3 = -Math.acos(cosJ3);
+            const alpha = Math.atan2(wy, wx);
+            const beta = Math.atan2(b * Math.sin(j3), a + b * Math.cos(j3));
+            const j2 = alpha - beta;
+            const j4 = pitch - j2 - j3;
+
+            const sol = [
+                r2d(j1),
+                r2d(Math.PI/2 - j2),
+                r2d(-j3),
+                r2d(-j4),
+                Q[4]
+            ];
+
+            setJoints(sol);
+            status.innerText = '✓ IK solution applied';
+            status.className = 'ik-status ok';
+            PARC?.Toast?.show(t('settings.errors.ik_solution_applied'), 'success');
+        }
+
+        /* 3D Scene Setup */
+        function init3D() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(45, 1, 0.01, 10);
+            camera.position.set(0.6, 0.4, 0.6);
+            camera.lookAt(0, 0.1, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            const container = document.getElementById('renderer');
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+            const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+            sun.position.set(1, 2, 1);
+            scene.add(sun);
+
+            scene.add(new THREE.GridHelper(1, 10, 0x1e293b, 0x0f172a));
+
+            const linkMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.3 });
+            for (let i = 0; i < 5; i++) {
+                const l = new THREE.Mesh(new THREE.BoxGeometry(0.02, 1, 0.02), linkMat);
+                links.push(l);
+                scene.add(l);
+                
+                const j = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.015), 
+                    new THREE.MeshStandardMaterial({ color: JCOLORS[i], emissive: JCOLORS[i], emissiveIntensity: 0.2 })
+                );
+                joints.push(j);
+                scene.add(j);
+            }
+            
+            const tool = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.015, 0.04), linkMat);
+            links.push(tool);
+            scene.add(tool);
+
+            // Resize handler
+            window.addEventListener('resize', () => {
+                if (container.clientWidth && container.clientHeight) {
+                    camera.aspect = container.clientWidth / container.clientHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(container.clientWidth, container.clientHeight);
+                }
+            });
+
+            loop();
+        }
+
+        function loop() {
+            requestAnimationFrame(loop);
+            const frames = fk(Q);
+            
+            for (let i = 0; i < 5; i++) {
+                joints[i].position.copy(frames[i].pos);
+                
+                const start = frames[i].pos;
+                const end = frames[i+1].pos;
+                const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+                links[i].position.copy(mid);
+                links[i].lookAt(end);
+                links[i].rotateX(Math.PI/2);
+                links[i].scale.set(1, start.distanceTo(end), 1);
+            }
+            
+            document.getElementById('cur-x').value = frames[5].pos.x.toFixed(3);
+            document.getElementById('cur-y').value = frames[5].pos.y.toFixed(3);
+            document.getElementById('cur-z').value = frames[5].pos.z.toFixed(3);
+
+            renderer.render(scene, camera);
+        }
+
+        function setJoints(angles) {
+            angles.forEach((a, i) => {
+                Q[i] = Math.max(LIMITS[i][0], Math.min(LIMITS[i][1], a));
+                const slider = document.getElementById(`slider-${i}`);
+                if (slider) slider.value = Q[i];
+                const val = document.getElementById(`val-${i}`);
+                if (val) val.innerText = Q[i].toFixed(1) + '°';
+            });
+        }
+
+        function resetAll() {
+            setJoints([0, 0, 0, 0, 0]);
+            document.getElementById('mode-badge').textContent = 'FK ACTIVE';
+            document.getElementById('mode-badge').className = 'badge b-blue';
+            PARC?.Toast?.show(t('settings.errors.robot_reset'), 'success');
+        }
+
+        function initUI() {
+            const ctrl = document.getElementById('joint-controls');
+            JOINT_NAMES.forEach((name, i) => {
+                ctrl.innerHTML += `
+                    <div class="joint-row">
+                        <div class="joint-header">
+                            <span class="joint-name">${name}</span>
+                            <span class="joint-value" id="val-${i}">0.0°</span>
+                        </div>
+                        <input type="range" id="slider-${i}" 
+                            min="${LIMITS[i][0]}" max="${LIMITS[i][1]}" value="0" step="0.1" 
+                            oninput="Q[${i}]=parseFloat(this.value); document.getElementById('val-${i}').textContent=this.value+'°';">
+                    </div>`;
+            });
+
+            const dims = document.getElementById('dim-controls');
+            Object.keys(D).forEach(key => {
+                dims.innerHTML += `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: var(--r-sm);">
+                        <span style="font-family:var(--mono); font-size:11px; color:var(--text-muted);">${key}</span>
+                        <input type="number" class="num-input" style="width:70px; padding:4px;" 
+                            value="${D[key]}" step="0.001" 
+                            onchange="D['${key}']=parseFloat(this.value)">
+                    </div>`;
+            });
+        }
+
+        // Canvas mouse tracking for glow effect
+        document.getElementById('canvas-wrap')?.addEventListener('mousemove', e => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width * 100).toFixed(1);
+            const y = ((e.clientY - rect.top) / rect.height * 100).toFixed(1);
+            e.currentTarget.style.setProperty('--mouse-x', `${x}%`);
+            e.currentTarget.style.setProperty('--mouse-y', `${y}%`);
+        });
+
+        window.onload = () => {
+            initUI();
+            init3D();
+            resetAll();
+            
+            // Trigger animations
+            setTimeout(() => {
+                document.querySelectorAll('.animate-in-up').forEach(el => {
+                    el.classList.add('animate-in-up');
+                });
+            }, 100);
+        };
+    </script>
+</body>
+</html>

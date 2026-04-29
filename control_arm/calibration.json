@@ -1,0 +1,58 @@
+{
+  "limits_deg": {
+    "shoulder_pan": {
+      "min": -89.8,
+      "ctr": -0.1,
+      "max": 89.7
+    },
+    "shoulder_lift": {
+      "min": -17.6,
+      "ctr": 19.3,
+      "max": 56.4
+    },
+    "elbow_flex": {
+      "min": -89.1,
+      "ctr": -43.6,
+      "max": 1.8
+    },
+    "wrist_flex": {
+      "min": -88.8,
+      "ctr": -36.6,
+      "max": 15.7
+    },
+    "wrist_roll": {
+      "min": -80.1,
+      "ctr": 4.8,
+      "max": 89.8
+    },
+    "gripper": {
+      "min": -7.2,
+      "ctr": 41.2,
+      "max": 89.7
+    }
+  },
+  "min_pos": {
+    "shoulder_pan": 1026,
+    "shoulder_lift": 1848,
+    "elbow_flex": 1035,
+    "wrist_flex": 1038,
+    "wrist_roll": 1137,
+    "gripper": 1966
+  },
+  "max_pos": {
+    "shoulder_pan": 3068,
+    "shoulder_lift": 2689,
+    "elbow_flex": 2069,
+    "wrist_flex": 2227,
+    "wrist_roll": 3069,
+    "gripper": 3068
+  },
+  "center_pos": {
+    "shoulder_pan": 2047,
+    "shoulder_lift": 2268,
+    "elbow_flex": 1552,
+    "wrist_flex": 1632,
+    "wrist_roll": 2103,
+    "gripper": 2517
+  }
+}

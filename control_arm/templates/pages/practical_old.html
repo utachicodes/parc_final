@@ -1,0 +1,2394 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t('practical.title') }} - SO-101</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+    <script src="{{ url_for('static', filename='js/robot-arm-3d.js') }}"></script>
+    <!-- CodeMirror for Python Syntax Highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/monokai.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
+    <style>
+        .practical-layout {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            grid-template-rows: calc(100vh - var(--header-height)) auto;
+            height: calc(100vh - var(--header-height));
+            overflow: hidden;
+        }
+
+        /* Main Content Area */
+        .practical-main {
+            display: grid;
+            grid-template-rows: 1fr 1fr;
+            border-right: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 12px 16px;
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-header h3 {
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+        }
+
+        .panel-tabs {
+            display: flex;
+            gap: 4px;
+        }
+
+        .panel-tab {
+            padding: 6px 12px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: var(--r-sm);
+            color: var(--text-muted);
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .panel-tab:hover {
+            border-color: var(--border2);
+            color: var(--text);
+        }
+
+        .panel-tab.active {
+            background: var(--blue-dim);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        /* 3D Viewers */
+        .viewer-3d {
+            position: relative;
+            background: radial-gradient(circle at center, #0f172a 0%, var(--bg) 100%);
+            overflow: hidden;
+        }
+
+        .viewer-3d canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .viewer-overlay {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .viewer-tag {
+            padding: 4px 10px;
+            background: rgba(0,0,0,0.7);
+            border-radius: var(--r-sm);
+            font-family: var(--mono);
+            font-size: 9px;
+            color: var(--text-muted);
+            backdrop-filter: blur(4px);
+        }
+
+        /* Code Editor */
+        .code-editor {
+            display: flex;
+            flex-direction: column;
+            background: var(--bg2);
+            border-top: 1px solid var(--border);
+        }
+
+        .code-editor .panel-header {
+            border-top: none;
+        }
+
+        .code-area {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* CodeMirror overrides for dark theme */
+        .CodeMirror {
+            height: 100% !important;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+            font-size: 13px !important;
+            line-height: 1.6 !important;
+            background: var(--bg2) !important;
+            color: var(--text) !important;
+        }
+
+        .CodeMirror-gutters {
+            background: var(--bg3) !important;
+            border-right: 1px solid var(--border) !important;
+        }
+
+        .CodeMirror-linenumber {
+            color: var(--text-dim) !important;
+            padding: 0 12px 0 8px !important;
+        }
+
+        .CodeMirror-activeline-background {
+            background: rgba(59, 130, 246, 0.08) !important;
+        }
+
+        .CodeMirror-selected {
+            background: rgba(59, 130, 246, 0.2) !important;
+        }
+
+        .CodeMirror-matchingbracket {
+            color: var(--blue) !important;
+            font-weight: bold;
+        }
+
+        /* Python syntax colors */
+        .cm-keyword { color: #ff79c6 !important; }
+        .cm-string { color: #f1fa8c !important; }
+        .cm-number { color: #bd93f9 !important; }
+        .cm-comment { color: #6272a4 !important; font-style: italic; }
+        .cm-def { color: #50fa7b !important; }
+        .cm-variable { color: var(--text) !important; }
+        .cm-variable-2 { color: #8be9fd !important; }
+        .cm-operator { color: #ff79c6 !important; }
+        .cm-builtin { color: #8be9fd !important; }
+        .cm-property { color: var(--text) !important; }
+        .cm-atom { color: #bd93f9 !important; }
+
+        .line-numbers {
+            width: 48px;
+            background: var(--bg3);
+            border-right: 1px solid var(--border);
+            padding: 16px 0;
+            font-family: var(--mono);
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--text-dim);
+            text-align: right;
+            user-select: none;
+            overflow: hidden;
+            display: none; /* Hidden when using CodeMirror */
+        }
+
+        .line-numbers span {
+            display: block;
+            padding-right: 12px;
+        }
+
+        .code-content {
+            flex: 1;
+            padding: 16px;
+            font-family: var(--mono);
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--text);
+            background: transparent;
+            border: none;
+            outline: none;
+            resize: none;
+            overflow: auto;
+            white-space: pre;
+            tab-size: 4;
+            display: none; /* Hidden when using CodeMirror */
+        }
+
+        /* Code Editor container for CodeMirror */
+        #code-editor-container {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .code-footer {
+            padding: 12px 16px;
+            background: var(--bg3);
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .code-status {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .code-status .ok {
+            color: var(--green);
+        }
+
+        /* Right Sidebar */
+        .practical-sidebar {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Camera Feed */
+        .camera-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-bottom: 1px solid var(--border);
+            min-height: 200px;
+        }
+
+        .camera-feed {
+            flex: 1;
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .camera-feed canvas,
+        .camera-feed video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .camera-placeholder {
+            color: var(--text-dim);
+            font-family: var(--mono);
+            font-size: 11px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .camera-placeholder svg {
+            opacity: 0.3;
+        }
+
+        /* AI Chat */
+        .ai-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 250px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .chat-message {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 12px;
+            line-height: 1.5;
+            animation: fadeInUp 0.3s ease;
+        }
+
+        .chat-message.user {
+            align-self: flex-end;
+            background: var(--blue-dim);
+            color: var(--blue);
+            border-bottom-right-radius: 4px;
+        }
+
+        .chat-message.ai {
+            align-self: flex-start;
+            background: var(--bg3);
+            color: var(--text);
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-message .typing {
+            display: flex;
+            gap: 4px;
+            padding: 4px 0;
+        }
+
+        .chat-message .typing span {
+            width: 6px;
+            height: 6px;
+            background: var(--text-dim);
+            border-radius: 50%;
+            animation: typing 1s infinite;
+        }
+
+        .chat-message .typing span:nth-child(2) { animation-delay: 0.2s; }
+        .chat-message .typing span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        .chat-input-area {
+            padding: 12px 16px;
+            background: var(--bg3);
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 8px;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 10px 14px;
+            background: var(--bg4);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            color: var(--text);
+            font-family: var(--sans);
+            font-size: 12px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .chat-input:focus {
+            border-color: var(--blue);
+        }
+
+        .chat-input::placeholder {
+            color: var(--text-dim);
+        }
+
+        .chat-send {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--blue);
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .chat-send:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 12px var(--blue-glow);
+        }
+
+        .chat-send:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .practical-layout {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto;
+            }
+
+            .practical-main {
+                grid-template-rows: 300px 300px;
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .practical-sidebar {
+                flex-direction: row;
+                height: 300px;
+            }
+
+            .camera-panel,
+            .ai-chat {
+                flex: 1;
+                border-right: 1px solid var(--border);
+                min-height: auto;
+            }
+
+            .ai-chat {
+                border-right: none;
+            }
+        }
+
+        /* Pieces/Objects Dictionary Panel */
+        .pieces-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-bottom: 1px solid var(--border);
+            min-height: 180px;
+            max-height: 250px;
+        }
+
+        .pieces-grid {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            align-content: start;
+        }
+
+        .piece-item {
+            padding: 10px 8px;
+            background: var(--bg4);
+            border: 1px solid var(--border);
+            border-radius: var(--r-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .piece-item:hover {
+            border-color: var(--blue);
+            background: var(--bg3);
+            transform: translateY(-2px);
+        }
+
+        .piece-item.active {
+            border-color: var(--blue);
+            background: var(--blue-dim);
+        }
+
+        .piece-item .piece-icon {
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+
+        .piece-item .piece-name {
+            font-family: var(--mono);
+            font-size: 9px;
+            font-weight: 600;
+            color: var(--text);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Documentation Panel */
+        .doc-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg2);
+            min-height: 200px;
+        }
+
+        .doc-header {
+            padding: 12px 16px;
+            background: var(--bg3);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .doc-header h4 {
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin: 0;
+        }
+
+        .doc-content {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.7;
+            color: var(--text);
+        }
+
+        .doc-content h5 {
+            font-family: var(--mono);
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--blue);
+            margin: 0 0 8px 0;
+        }
+
+        .doc-content p {
+            margin: 0 0 12px 0;
+            color: var(--text-secondary);
+        }
+
+        .doc-content .doc-code {
+            background: var(--bg4);
+            border: 1px solid var(--border);
+            border-radius: var(--r-sm);
+            padding: 10px;
+            font-family: var(--mono);
+            font-size: 11px;
+            margin: 8px 0;
+            white-space: pre-wrap;
+            color: var(--green);
+        }
+
+        .doc-content .doc-section {
+            margin-bottom: 16px;
+        }
+
+        .doc-content .doc-section-title {
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .doc-empty {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-dim);
+            font-family: var(--mono);
+            font-size: 11px;
+            gap: 8px;
+        }
+
+        .doc-empty svg {
+            opacity: 0.3;
+        }
+
+        /* Tabs for sidebar sections */
+        .sidebar-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg2);
+        }
+
+        .sidebar-tab {
+            flex: 1;
+            padding: 10px 8px;
+            background: transparent;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--text-muted);
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .sidebar-tab:hover {
+            color: var(--text);
+            background: var(--bg3);
+        }
+
+        .sidebar-tab.active {
+            color: var(--blue);
+            border-bottom-color: var(--blue);
+        }
+
+        .sidebar-tab-content {
+            display: none;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar-tab-content.active {
+            display: flex;
+            flex-direction: column;
+        }
+    </style>
+    <script>
+        window.__TRANSLATIONS__ = {{ en_json | tojson }};
+        window.__CURRENT_LANG__ = "{{ lang }}";
+    </script>
+</head>
+<body>
+    <a href="/" class="skip-link">Back to Home</a>
+
+    <header class="header">
+        <div class="header-title">
+            <div class="icon">SO-101</div>
+            <span>{{ t('practical.title') }}</span>
+        </div>
+        <div class="header-controls">
+            <div class="lang-switch">
+                <button class="lang-btn {% if lang == 'en' %}active{% endif %}" onclick="setLang('en')">EN</button>
+                <button class="lang-btn {% if lang == 'fr' %}active{% endif %}" onclick="setLang('fr')">FR</button>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="runCode()">{{ t('practical.run') }}</button>
+        </div>
+    </header>
+
+    <div class="practical-layout">
+        <!-- Main Area -->
+        <div class="practical-main">
+            <!-- 3D Robot Viewer -->
+            <div class="viewer-3d" id="robot-viewer">
+                <div id="robot-canvas"></div>
+                <div class="viewer-overlay">
+                    <span class="viewer-tag" id="sync-indicator" style="color:#888;">○ SYNC</span>
+                    <span class="viewer-tag">FK</span>
+                    <span class="viewer-tag">{{ t('practical.drag_rotate') }}</span>
+                </div>
+            </div>
+
+            <!-- Simulation Controls -->
+            <div class="sim-controls">
+                <div class="panel-header">
+                    <h3>Simulation</h3>
+                    <div class="sim-actions">
+                        <button class="btn btn-sm" id="btn-pick-place" onclick="runPickPlaceSim()">
+                            ▶ Pick & Place
+                        </button>
+                        <button class="btn btn-sm btn-ghost" onclick="clearSimulation()">
+                            Clear
+                        </button>
+                    </div>
+                </div>
+                <div class="sim-content">
+                    <div class="sim-targets">
+                        <div class="sim-row">
+                            <label>Pick Position:</label>
+                            <input type="text" id="pick-position" value="-0.05, 0.08, 0.05" size="20">
+                        </div>
+                        <div class="sim-row">
+                            <label>Place Position:</label>
+                            <input type="text" id="place-position" value="0.05, -0.08, 0.05" size="20">
+                        </div>
+                        <div class="sim-row">
+                            <label>Duration (s):</label>
+                            <input type="number" id="move-duration" value="2.0" min="0.5" max="10" step="0.5">
+                        </div>
+                    </div>
+                    <div class="sim-progress" id="sim-progress" style="display:none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <span class="progress-text" id="progress-text">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vision AI Commands -->
+            <div class="vision-panel">
+                <div class="panel-header">
+                    <h3>Vision AI</h3>
+                    <button class="btn btn-sm" id="btn-detect-scene" onclick="detectScene()">
+                        👁 Detect
+                    </button>
+                </div>
+                <div class="vision-content">
+                    <div class="vision-command">
+                        <input type="text" id="ai-command" placeholder="e.g., 'pick the red cube'" size="25">
+                        <button class="btn btn-sm" onclick="executeAICommand()">▶</button>
+                    </div>
+                    <div class="vision-detections" id="vision-detections">
+                        <span class="detection-tag">No objects detected</span>
+                    </div>
+                    <div class="vision-plan" id="vision-plan" style="display:none;">
+                        <h4>Execution Plan:</h4>
+                        <div id="plan-steps"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gripper Camera View -->
+            <div class="gripper-cam-panel">
+                <div class="panel-header">
+                    <h3>Gripper Cam</h3>
+                    <div class="cam-controls">
+                        <button class="btn btn-sm" id="btn-gripper-cam" onclick="toggleGripperCam()">
+                            📷 Start
+                        </button>
+                        <select id="gripper-cam-select" class="cam-select">
+                            <option value="1">Cam 1</option>
+                            <option value="0">Cam 0</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="gripper-cam-view">
+                    <img id="gripper-cam-feed" src="" alt="Gripper Camera" style="display:none;">
+                    <div id="gripper-cam-placeholder" class="cam-placeholder">
+                        Camera off
+                    </div>
+                </div>
+                <div class="gripper-cam-detections" id="gripper-detections">
+                    <!-- YOLOE detections overlay -->
+                </div>
+            </div>
+
+            <!-- Code Editor -->
+            <div class="code-editor">
+                <div class="panel-header">
+                    <h3>{{ t('practical.code_editor') }}</h3>
+                    <div class="panel-tabs">
+                        <button class="panel-tab active">Python</button>
+                        <button class="panel-tab">Blocks</button>
+                    </div>
+                </div>
+                <div class="code-area">
+                    <div id="code-editor-container"></div>
+                </div>
+                <div class="code-footer">
+                    <span class="code-status" id="cursor-position"><span class="ok">Python 3.11</span> | Ln 1, Col 1</span>
+                    <button class="btn btn-sm btn-ghost" onclick="clearCode()">{{ t('practical.clear') }}</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar -->
+        <div class="practical-sidebar">
+            <!-- Pieces/Objects Dictionary -->
+            <div class="pieces-panel">
+                <div class="panel-header">
+                    <h3>{{ t('practical.pieces') | default('Pieces & Modes') }}</h3>
+                </div>
+                <div class="pieces-grid" id="pieces-grid">
+                    <!-- Dynamically populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Documentation Panel -->
+            <div class="doc-panel" id="doc-panel">
+                <div class="doc-header">
+                    <h4 id="doc-title">{{ t('practical.documentation') | default('Documentation') }}</h4>
+                    <button class="btn btn-sm btn-ghost" onclick="clearDoc()" title="Clear">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="doc-content" id="doc-content">
+                    <div class="doc-empty" id="doc-empty">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                            <polyline points="14,2 14,8 20,8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                            <polyline points="10,9 9,9 8,9"/>
+                        </svg>
+                        <span>{{ t('practical.select_piece') | default('Select a piece to view documentation') }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Camera Feed -->
+            <div class="camera-panel">
+                <div class="panel-header">
+                    <h3>{{ t('practical.robot_camera') }}</h3>
+                    <div class="panel-tabs">
+                        <button class="panel-tab active" id="cam-tab-0" onclick="discoverCamera(0)">C1</button>
+                        <button class="panel-tab" id="cam-tab-1" onclick="discoverCamera(1)">C2</button>
+                    </div>
+                </div>
+                <div class="camera-feed" id="camera-feed">
+                    <div class="camera-placeholder" id="camera-placeholder">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                            <rect x="2" y="4" width="20" height="16" rx="2"/>
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M18 8h1a2 2 0 012 2v8a2 2 0 01-2 2h-1"/>
+                        </svg>
+                        <span>{{ t('practical.camera_off') }}</span>
+                    </div>
+                    <canvas id="video-canvas" style="display: none;"></canvas>
+                    <div id="camera-status" style="position:absolute;top:12px;left:12px;font-size:10px;color:var(--text-muted);font-family:var(--mono);"></div>
+                    <div class="vision-controls" style="position: absolute; bottom: 12px; right: 12px; display: flex; gap: 8px;">
+                        <button class="btn btn-sm btn-ghost" id="discover-camera-btn" onclick="discoverCamera()">Discover</button>
+                        <button class="btn btn-sm btn-primary" id="toggle-camera-btn" onclick="toggleCamera()">{{ t('practical.connect_camera') }}</button>
+                        <button class="btn btn-sm btn-secondary" id="analyze-btn" onclick="analyzeImage()" style="display: none;">{{ t('practical.analyze_scene') }}</button>
+                        <button class="btn btn-sm btn-secondary" id="detect-btn" onclick="detectObjects()" style="display: none;">{{ t('practical.detect_objects') }}</button>
+                    </div>
+                    <div class="analysis-result" id="analysis-result" style="position: absolute; top: 12px; left: 12px; right: 70px; display: none; padding: 12px; background: rgba(0,0,0,0.85); border-radius: 8px; font-family: var(--mono); font-size: 11px; color: var(--text); max-height: 150px; overflow-y: auto;"></div>
+                    <div class="detection-result" id="detection-result" style="position: absolute; top: 12px; left: 12px; right: 70px; display: none; padding: 12px; background: rgba(0,50,0,0.85); border-radius: 8px; font-family: var(--mono); font-size: 11px; color: var(--green); max-height: 150px; overflow-y: auto;"></div>
+                </div>
+            </div>
+
+            <!-- AI Assistant -->
+            <div class="ai-chat">
+                <div class="panel-header">
+                    <h3>AI Assistant</h3>
+                    <div class="flex items-center gap-sm">
+                        <span class="status-dot disconnected" id="ai-status-dot"></span>
+                        <span class="text-sm text-muted" id="ai-status-text" style="font-size: 9px;">OFFLINE</span>
+                    </div>
+                </div>
+                <div class="chat-messages" id="chat-messages">
+                    <div class="chat-message ai">
+                        {{ t('practical.ai_greeting') }}
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <input type="text" class="chat-input" id="chat-input" placeholder="{{ t('practical.ai_placeholder') }}" onkeydown="handleChatKey(event)">
+                    <button class="chat-send" id="chat-send" onclick="sendMessage()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                        </svg>
+                    </button>
+                    <button class="btn btn-sm btn-ghost" id="speak-btn" onclick="speakLastResponse()" style="margin-left: 4px; display: none;" title="{{ t('practical.speak_response') }}">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                            <path d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Voice Control -->
+            <div class="voice-panel" style="border-top: 1px solid var(--border); padding: 16px; background: var(--bg2);">
+                <div class="panel-header" style="padding: 0; background: transparent; border: none; margin-bottom: 12px;">
+                    <h3>{{ t('practical.voice_command') }}</h3>
+                </div>
+                <div class="voice-controls" style="display: flex; align-items: center; gap: 12px;">
+                    <button class="btn btn-primary btn-sm" id="record-btn" onclick="toggleRecording()" style="min-width: 120px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                            <path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/>
+                        </svg>
+                        {{ t('practical.start_recording') }}
+                    </button>
+                    <div id="recording-indicator" style="display: none; align-items: center; gap: 8px; color: var(--red); font-family: var(--mono); font-size: 11px;">
+                        <span class="recording-dot" style="width: 8px; height: 8px; background: var(--red); border-radius: 50%; animation: pulse 1s infinite;"></span>
+                        Recording...
+                    </div>
+                </div>
+                <div id="voice-result" style="margin-top: 12px; padding: 10px 12px; background: var(--bg4); border-radius: 8px; font-family: var(--mono); font-size: 11px; display: none;"></div>
+                <div style="margin-top: 12px;">
+                    <button class="btn btn-sm btn-ghost" onclick="executeVoiceCommand()" id="execute-cmd-btn" style="display: none;">
+                        {{ t('practical.execute_command') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/animations.js') }}"></script>
+    <script>
+        // Language
+        function setLang(lang) {
+            document.cookie = `lang=${lang};path=/;max-age=${60*60*24*365}`;
+            window.location.reload();
+        }
+
+        function t(key) {
+            const trans = window.__TRANSLATIONS__[window.__CURRENT_LANG__] || {};
+            const keys = key.split('.');
+            let val = trans;
+            for (const k of keys) {
+                if (val && typeof val === 'object') val = val[k];
+                else return key;
+            }
+            return typeof val === 'string' ? val : key;
+        }
+
+        // Pieces/Objects Dictionary Data
+        const PIECES_DICTIONARY = {
+            // Robot Modes
+            'idle': {
+                name: 'Idle',
+                icon: '⚪',
+                category: 'mode',
+                doc: {
+                    title: 'Idle Mode',
+                    description: 'Places the robot in a resting position with slight bends at the shoulder and elbow for stability.',
+                    positions: { shoulder_pan: 0, shoulder_lift: 10, elbow_flex: -10, wrist_flex: 0, wrist_roll: 0, gripper: 0 },
+                    code: '# Idle Position\npositions = { "shoulder_pan": 0, "shoulder_lift": 10, "elbow_flex": -10, "wrist_flex": 0, "wrist_roll": 0, "gripper": 0 }',
+                    useCase: 'Use when the robot is not performing any task and should conserve energy while remaining ready.'
+                }
+            },
+            'hello': {
+                name: 'Hello',
+                icon: '👋',
+                category: 'mode',
+                doc: {
+                    title: 'Hello Wave Gesture',
+                    description: 'A friendly wave gesture that raises the arm and performs multiple wrist rotations.',
+                    positions: { shoulder_pan: 25, shoulder_lift: -30, elbow_flex: 50, wrist_flex: 10, wrist_roll: 0, gripper: -20 },
+                    code: '# Hello Gesture\npositions = { "shoulder_pan": 25, "shoulder_lift": -30, "elbow_flex": 50, "wrist_flex": 10, "wrist_roll": 50, "gripper": -20 }',
+                    useCase: 'Use as a greeting gesture when the robot needs to acknowledge someone.'
+                }
+            },
+            'pick_place': {
+                name: 'Pick&Place',
+                icon: '🤖',
+                category: 'mode',
+                doc: {
+                    title: 'Pick and Place Sequence',
+                    description: 'A complete pick and place motion that moves an object from left to right.',
+                    positions: { shoulder_pan: -35, shoulder_lift: -20, elbow_flex: 30, wrist_flex: 20, wrist_roll: 0, gripper: -50 },
+                    code: '# Pick and Place\npositions = { "shoulder_pan": -35, "shoulder_lift": -20, "elbow_flex": 30, "wrist_flex": 20, "wrist_roll": 0, "gripper": 40 }',
+                    useCase: 'Use for pick and place tasks. Customize gripper angle based on object size.'
+                }
+            },
+            'dance': {
+                name: 'Dance',
+                icon: '💃',
+                category: 'mode',
+                doc: {
+                    title: 'Dance Mode',
+                    description: 'An entertaining dance sequence with multiple arm movements and wrist rotations.',
+                    positions: { shoulder_pan: 0, shoulder_lift: -40, elbow_flex: 55, wrist_flex: 15, wrist_roll: 0, gripper: -30 },
+                    code: '# Dance Sequence\nWB = { "shoulder_pan": 0, "shoulder_lift": -40, "elbow_flex": 55, "wrist_flex": 15, "wrist_roll": 0, "gripper": -30 }',
+                    useCase: 'Use for demonstrations or entertainment purposes.'
+                }
+            },
+            'stretch': {
+                name: 'Stretch',
+                icon: '🧘',
+                category: 'mode',
+                doc: {
+                    title: 'Stretch Mode',
+                    description: 'A stretching sequence that extends the arm in multiple directions.',
+                    positions: { shoulder_pan: 0, shoulder_lift: -40, elbow_flex: 60, wrist_flex: 25, wrist_roll: 0, gripper: -30 },
+                    code: '# Stretch Position\npositions = { "shoulder_pan": 0, "shoulder_lift": -40, "elbow_flex": 60, "wrist_flex": 25, "wrist_roll": 0, "gripper": -30 }',
+                    useCase: 'Use before or after tasks to limber up the robot joints.'
+                }
+            },
+            'salute': {
+                name: 'Salute',
+                icon: '敬礼',
+                category: 'mode',
+                doc: {
+                    title: 'Salute Gesture',
+                    description: 'A formal salute gesture with bent elbow and raised wrist.',
+                    positions: { shoulder_pan: 15, shoulder_lift: -30, elbow_flex: 55, wrist_flex: 30, wrist_roll: 20, gripper: -10 },
+                    code: '# Salute Position\npositions = { "shoulder_pan": 15, "shoulder_lift": -30, "elbow_flex": 55, "wrist_flex": 30, "wrist_roll": 20, "gripper": -10 }',
+                    useCase: 'Use as a respectful greeting or acknowledgment gesture.'
+                }
+            },
+            'shake': {
+                name: 'Handshake',
+                icon: '🤝',
+                category: 'mode',
+                doc: {
+                    title: 'Handshake Mode',
+                    description: 'A handshake-ready position with extended arm and open gripper.',
+                    positions: { shoulder_pan: -20, shoulder_lift: 5, elbow_flex: -20, wrist_flex: 0, wrist_roll: 0, gripper: -50 },
+                    code: '# Handshake Position\npositions = { "shoulder_pan": -20, "shoulder_lift": 5, "elbow_flex": -20, "wrist_flex": 0, "wrist_roll": 0, "gripper": 30 }',
+                    useCase: 'Use when preparing for a handshake with a human.'
+                }
+            },
+            // Servos
+            'shoulder_pan': {
+                name: 'Pan',
+                icon: '🔄',
+                category: 'servo',
+                doc: {
+                    title: 'Shoulder Pan (Base Rotation)',
+                    description: 'Rotates the base of the robot arm horizontally. Controls left/right movement.',
+                    positions: { min: -110, max: 110, default: 0 },
+                    code: '# Pan servo: controls base rotation\nservo_id = 1  # shoulder_pan\nposition = 0  # degrees (-110 to 110)',
+                    useCase: 'Use to rotate the entire arm assembly left or right.'
+                }
+            },
+            'shoulder_lift': {
+                name: 'Lift',
+                icon: '⬆️',
+                category: 'servo',
+                doc: {
+                    title: 'Shoulder Lift',
+                    description: 'Raises or lowers the main arm segment at the shoulder joint.',
+                    positions: { min: -100, max: 90, default: 0 },
+                    code: '# Lift servo: controls arm height\nservo_id = 2  # shoulder_lift\nposition = 0  # degrees (-100 to 90)',
+                    useCase: 'Use to raise or lower the arm height for different tasks.'
+                }
+            },
+            'elbow_flex': {
+                name: 'Elbow',
+                icon: '💪',
+                category: 'servo',
+                doc: {
+                    title: 'Elbow Flex',
+                    description: 'Bends the elbow joint, controlling the angle of the forearm.',
+                    positions: { min: -140, max: 140, default: 0 },
+                    code: '# Elbow servo: controls forearm angle\nservo_id = 3  # elbow_flex\nposition = 0  # degrees (-140 to 140)',
+                    useCase: 'Use to bend or straighten the elbow for reaching or grasping.'
+                }
+            },
+            'wrist_flex': {
+                name: 'Wrist Flex',
+                icon: '🤏',
+                category: 'servo',
+                doc: {
+                    title: 'Wrist Flex',
+                    description: 'Tilts the wrist up or down, adjusting the gripper angle.',
+                    positions: { min: -100, max: 100, default: 0 },
+                    code: '# Wrist Flex servo: controls wrist tilt\nservo_id = 4  # wrist_flex\nposition = 0  # degrees (-100 to 100)',
+                    useCase: 'Use to tilt the gripper for better approach angles.'
+                }
+            },
+            'wrist_roll': {
+                name: 'Wrist Roll',
+                icon: '🔃',
+                category: 'servo',
+                doc: {
+                    title: 'Wrist Roll',
+                    description: 'Rotates the wrist, spinning the gripper horizontally.',
+                    positions: { min: -150, max: 150, default: 0 },
+                    code: '# Wrist Roll servo: controls rotation\nservo_id = 5  # wrist_roll\nposition = 0  # degrees (-150 to 150)',
+                    useCase: 'Use to rotate the gripper for拧开瓶盖 or oriented placement.'
+                }
+            },
+            'gripper': {
+                name: 'Gripper',
+                icon: '✋',
+                category: 'servo',
+                doc: {
+                    title: 'Gripper',
+                    description: 'Opens and closes the gripper claws. Positive values close, negative open.',
+                    positions: { min: 0, max: 60, default: 0 },
+                    code: '# Gripper servo: opens/closes claws\nservo_id = 6  # gripper\nposition = 0  # degrees (0-60: closed, negative: open)',
+                    useCase: 'Use to grasp objects (close) or release them (open).'
+                }
+            },
+            // Vision Modes
+            'face': {
+                name: 'Face Track',
+                icon: '👤',
+                category: 'vision',
+                doc: {
+                    title: 'Face Tracking Mode',
+                    description: 'Uses the camera to detect and track a human face. Robot follows face position.',
+                    code: '# Face Tracking\ntracking_mode = "face"\n# Robot will follow detected face position',
+                    useCase: 'Use for human-robot interaction where the robot should look at and follow the user.'
+                }
+            },
+            'hand': {
+                name: 'Hand Track',
+                icon: '✋',
+                category: 'vision',
+                doc: {
+                    title: 'Hand Tracking Mode',
+                    description: 'Tracks hand position and gestures. Robot follows hand for pointing or reaching tasks.',
+                    code: '# Hand Tracking\ntracking_mode = "hand"\n# Robot follows detected hand position',
+                    useCase: 'Use for gesture-based control or hand guidance tasks.'
+                }
+            },
+            'pose': {
+                name: 'Pose Track',
+                icon: '🧍',
+                category: 'vision',
+                doc: {
+                    title: 'Body Pose Tracking',
+                    description: 'Tracks body pose landmarks (nose, shoulders, elbows, wrists). Maps body movement to robot motion.',
+                    code: '# Pose Tracking\ntracking_mode = "pose"\n# Tracks body landmarks for full body control',
+                    useCase: 'Use for full body gesture control or teleoperation.'
+                }
+            },
+            'body': {
+                name: 'Full Body',
+                icon: '🦾',
+                category: 'vision',
+                doc: {
+                    title: 'Full Body Control',
+                    description: 'Advanced body tracking that maps shoulder, elbow, and wrist positions to robot joints for natural arm control.',
+                    code: '# Full Body Control\ntracking_mode = "body"\n# Maps body pose to robot arm:\n# - Nose -> Pan/Tilt\n# - Left arm -> Elbow/Wrist',
+                    useCase: 'Use for intuitive teleoperation where your arm movements directly control the robot.'
+                }
+            },
+            // Actions
+            'home': {
+                name: 'Home',
+                icon: '🏠',
+                category: 'action',
+                doc: {
+                    title: 'Home Position',
+                    description: 'Returns all joints to zero position. The standard reference position.',
+                    positions: { shoulder_pan: 0, shoulder_lift: 0, elbow_flex: 0, wrist_flex: 0, wrist_roll: 0, gripper: 0 },
+                    code: '# Home Position (all zeros)\nhome = { "shoulder_pan": 0, "shoulder_lift": 0, "elbow_flex": 0, "wrist_flex": 0, "wrist_roll": 0, "gripper": 0 }',
+                    useCase: 'Use as a safe starting position or reset after tasks.'
+                }
+            },
+            'grip': {
+                name: 'Grip',
+                icon: '🤏',
+                category: 'action',
+                doc: {
+                    title: 'Grip Action',
+                    description: 'Closes the gripper to grasp an object. Typically 60 degrees for a firm grip.',
+                    positions: { gripper: 60 },
+                    code: '# Close gripper to grip\ngripper_angle = 60  # degrees',
+                    useCase: 'Use when picking up an object after positioning the gripper above it.'
+                }
+            },
+            'release': {
+                name: 'Release',
+                icon: '🖐️',
+                category: 'action',
+                doc: {
+                    title: 'Release Action',
+                    description: 'Opens the gripper to release a held object.',
+                    positions: { gripper: -60 },
+                    code: '# Open gripper to release\nrelease_angle = -60  # degrees',
+                    useCase: 'Use when placing an object to open the gripper before lowering.'
+                }
+            },
+            'wave': {
+                name: 'Wave',
+                icon: '🌊',
+                category: 'action',
+                doc: {
+                    title: 'Wave Action',
+                    description: 'A quick wave gesture using wrist rotation.',
+                    positions: { shoulder_pan: 25, shoulder_lift: -20, elbow_flex: 45, wrist_flex: -25, wrist_roll: 30, gripper: 0 },
+                    code: '# Wave gesture\nwave_pose = { "shoulder_pan": 25, "shoulder_lift": -20, "elbow_flex": 45, "wrist_flex": -25, "wrist_roll": 30, "gripper": 0 }',
+                    useCase: 'Use as a quick acknowledgment or goodbye gesture.'
+                }
+            }
+        };
+
+        // Initialize Pieces Grid
+        function initPiecesGrid() {
+            const grid = document.getElementById('pieces-grid');
+            if (!grid) return;
+
+            let html = '';
+            for (const [key, piece] of Object.entries(PIECES_DICTIONARY)) {
+                html += '<div class="piece-item" data-piece="' + key + '" onclick="showPieceDoc(\'' + key + '\')">';
+                html += '<div class="piece-icon">' + piece.icon + '</div>';
+                html += '<div class="piece-name">' + piece.name + '</div>';
+                html += '</div>';
+            }
+            grid.innerHTML = html;
+        }
+
+        // Show Piece Documentation
+        function showPieceDoc(pieceKey) {
+            const piece = PIECES_DICTIONARY[pieceKey];
+            if (!piece) return;
+
+            // Update active state
+            document.querySelectorAll('.piece-item').forEach(el => el.classList.remove('active'));
+            const itemEl = document.querySelector('.piece-item[data-piece="' + pieceKey + '"]');
+            if (itemEl) itemEl.classList.add('active');
+
+            // Build documentation HTML
+            let docHtml = '<div class="doc-section">';
+            docHtml += '<h5>' + piece.doc.title + '</h5>';
+            docHtml += '<p>' + piece.doc.description + '</p>';
+
+            if (piece.doc.positions) {
+                docHtml += '<div class="doc-section-title">Joint Positions</div>';
+                if (typeof piece.doc.positions === 'object' && !Array.isArray(piece.doc.positions)) {
+                    // It's a positions object with servo names
+                    docHtml += '<div class="doc-code">';
+                    for (const [joint, val] of Object.entries(piece.doc.positions)) {
+                        docHtml += joint + ': ' + val + '\n';
+                    }
+                    docHtml += '</div>';
+                } else if (piece.doc.positions.min !== undefined) {
+                    // It's a range object
+                    docHtml += '<div class="doc-code">Min: ' + piece.doc.positions.min + ' | Default: ' + piece.doc.positions.default + ' | Max: ' + piece.doc.positions.max + '</div>';
+                }
+            }
+
+            docHtml += '</div>';
+
+            if (piece.doc.code) {
+                docHtml += '<div class="doc-section-title">Code Example</div>';
+                docHtml += '<div class="doc-code">' + piece.doc.code + '</div>';
+            }
+
+            if (piece.doc.useCase) {
+                docHtml += '<div class="doc-section-title">Use Case</div>';
+                docHtml += '<p>' + piece.doc.useCase + '</p>';
+            }
+
+            // Add "Add to Editor" button
+            if (piece.doc.code) {
+                docHtml += '<button class="btn btn-sm btn-primary" style="margin-top:12px;width:100%;" onclick="addToEditor(\'' + pieceKey + '\')">';
+                docHtml += 'Add to Editor</button>';
+            }
+
+            document.getElementById('doc-content').innerHTML = docHtml;
+            document.getElementById('doc-empty').style.display = 'none';
+        }
+
+        // Add piece code to editor
+        function addToEditor(pieceKey) {
+            const piece = PIECES_DICTIONARY[pieceKey];
+            if (!piece || !piece.doc.code || !editor) return;
+
+            const code = piece.doc.code;
+            const currentCode = editor.getValue();
+
+            if (currentCode && !currentCode.endsWith('\n')) {
+                editor.setValue(currentCode + '\n\n' + code);
+            } else {
+                editor.setValue(currentCode + code);
+            }
+
+            PARC?.Toast?.show('Code added to editor', 'success');
+        }
+
+        // Clear documentation
+        function clearDoc() {
+            document.querySelectorAll('.piece-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('doc-content').innerHTML = '';
+            document.getElementById('doc-content').innerHTML = '<div class="doc-empty" id="doc-empty"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg><span>Select a piece to view documentation</span></div>';
+        }
+
+        // CodeMirror Editor
+        let editor;
+        const DEFAULT_CODE = `# SO-101 Robot Control Script
+# This example demonstrates basic robot movement
+
+from scservo_sdk import PortHandler, sms_sts
+
+# Servo IDs (from calibration)
+SERVO_IDS = {
+    'shoulder_pan': 1,
+    'shoulder_lift': 2,
+    'elbow_flex': 3,
+    'wrist_flex': 4,
+    'wrist_roll': 5,
+    'gripper': 6
+}
+
+# Initialize communication
+port = PortHandler('/dev/ttyACM0')
+port.openPort()
+port.setBaudRate(1000000)
+servo = sms_sts(port)
+
+# Convert degrees to servo units (0-4095, center=2048)
+DEGREE_TO_UNIT = 4095 / 360
+
+def send_positions(positions, speed=500, acc=50):
+    for name, pos_deg in positions.items():
+        if name in SERVO_IDS:
+            pos_unit = int(2048 + pos_deg * DEGREE_TO_UNIT)
+            servo.WritePosEx(SERVO_IDS[name], pos_unit, speed, acc)
+
+# Define home position (in degrees)
+home = {
+    'shoulder_pan': 0,
+    'shoulder_lift': 0,
+    'elbow_flex': 0,
+    'wrist_flex': 0,
+    'wrist_roll': 0,
+    'gripper': 0
+}
+
+# Move to home position
+send_positions(home)
+print("Robot at home position")`;
+
+        function initCodeEditor() {
+            const container = document.getElementById('code-editor-container');
+            if (!container) return;
+
+            editor = CodeMirror(container, {
+                value: DEFAULT_CODE,
+                mode: 'python',
+                theme: 'monokai',
+                lineNumbers: true,
+                matchBrackets: true,
+                autoCloseBrackets: true,
+                indentUnit: 4,
+                tabSize: 4,
+                indentWithTabs: false,
+                lineWrapping: false,
+                styleActiveLine: true,
+                autofocus: true,
+                extraKeys: {
+                    'Tab': 'indentMore',
+                    'Shift-Tab': 'indentLess',
+                    'Ctrl-Enter': function() { runCode(); },
+                    'Cmd-Enter': function() { runCode(); }
+                }
+            });
+
+            editor.setSize('100%', '100%');
+
+            // Cursor position tracking
+            editor.on('cursorActivity', () => {
+                const cursor = editor.getCursor();
+                const posEl = document.getElementById('cursor-position');
+                if (posEl) {
+                    posEl.innerHTML = `<span class="ok">Python 3.11</span> | Ln ${cursor.line + 1}, Col ${cursor.ch + 1}`;
+                }
+            });
+        }
+
+        // Run Code
+        async function runCode() {
+            const code = editor ? editor.getValue() : '';
+            if (!code.trim()) {
+                PARC?.Toast?.show('No code to execute', 'warning');
+                return;
+            }
+
+            try {
+                const validateResp = await fetch('/api/sim/validate-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code })
+                });
+                const validation = await validateResp.json();
+
+                if (!validation.valid) {
+                    const errorMsg = validation.errors.join('\n');
+                    PARC?.Toast?.show('Code validation failed:\n' + errorMsg, 'error');
+                    return;
+                }
+
+                if (validation.warnings && validation.warnings.length > 0) {
+                    const warnMsg = validation.warnings.join('\n');
+                    PARC?.Toast?.show('Warnings:\n' + warnMsg, 'warning');
+                }
+
+                const resp = await fetch('/api/practical/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code })
+                });
+                const result = await resp.json();
+                PARC?.Toast?.show(result.success ? t('settings.errors.code_executed_successfully') : result.error, result.success ? 'success' : 'error');
+            } catch (e) {
+                PARC?.Toast?.show(t('settings.errors.failed_to_execute_code'), 'error');
+            }
+        }
+
+        function clearCode() {
+            if (editor) {
+                editor.setValue('');
+            }
+        }
+
+        // AI Status
+        async function updateAIStatus() {
+            try {
+                const resp = await fetch('/api/ai/status');
+                const data = await resp.json();
+                const dot = document.getElementById('ai-status-dot');
+                const text = document.getElementById('ai-status-text');
+                if (data.connected) {
+                    dot.className = 'status-dot connected';
+                    text.textContent = 'ONLINE - ' + data.platform.split(' - ')[1];
+                } else {
+                    dot.className = 'status-dot disconnected';
+                    text.textContent = 'OFFLINE';
+                }
+            } catch (e) {
+                document.getElementById('ai-status-dot').className = 'status-dot disconnected';
+                document.getElementById('ai-status-text').textContent = 'OFFLINE';
+            }
+        }
+
+        // Chat
+        function handleChatKey(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            const messages = document.getElementById('chat-messages');
+            messages.innerHTML += `<div class="chat-message user">${msg}</div>`;
+            input.value = '';
+
+            const typing = document.createElement('div');
+            typing.className = 'chat-message ai';
+            typing.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+            messages.appendChild(typing);
+            messages.scrollTop = messages.scrollHeight;
+
+            try {
+                const resp = await fetch('/api/ai/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: msg, stream: false })
+                });
+                const data = await resp.json();
+                typing.innerHTML = data.response || data.error || 'Error occurred';
+                updateAIStatus();
+                
+                // Show speak button if TTS available
+                const speakBtn = document.getElementById('speak-btn');
+                if (data.response && speakBtn) {
+                    speakBtn.style.display = 'flex';
+                    speakBtn.dataset.text = data.response.substring(0, 500); // Limit length
+                }
+            } catch (e) {
+                typing.innerHTML = 'Failed to connect to AI assistant';
+            }
+        }
+        
+        async function speakLastResponse() {
+            const speakBtn = document.getElementById('speak-btn');
+            const text = speakBtn?.dataset?.text;
+            if (!text) return;
+            
+            try {
+                const resp = await fetch('/api/audio/speak', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })
+                });
+                if (resp.ok) {
+                    const blob = await resp.blob();
+                    const url = URL.createObjectURL(blob);
+                    const audio = new Audio(url);
+                    audio.play();
+                }
+            } catch (e) {
+                PARC?.Toast?.show(t('settings.errors.tts_unavailable'), 'error');
+            }
+        }
+
+        // Camera Discover
+        let currentCameraIndex = 0;
+        let availableCameras = [];
+
+        async function discoverCamera(index = null) {
+            const statusEl = document.getElementById('camera-status');
+            const discoverBtn = document.getElementById('discover-camera-btn');
+            const camTab0 = document.getElementById('cam-tab-0');
+            const camTab1 = document.getElementById('cam-tab-1');
+
+            discoverBtn.disabled = true;
+            discoverBtn.textContent = '...';
+
+            try {
+                // Get available cameras from backend
+                const resp = await fetch('/api/cameras');
+                const data = await resp.json();
+                availableCameras = data.cameras || [];
+
+                if (availableCameras.length === 0) {
+                    statusEl.textContent = 'No cameras found';
+                    PARC?.Toast?.show('No cameras detected', 'error');
+                    discoverBtn.disabled = false;
+                    discoverBtn.textContent = 'Discover';
+                    return;
+                }
+
+                statusEl.textContent = `Found ${availableCameras.length} camera(s)`;
+
+                // If index specified, use that camera
+                if (index !== null && index < availableCameras.length) {
+                    currentCameraIndex = index;
+                } else {
+                    // Auto-select first available
+                    currentCameraIndex = 0;
+                }
+
+                // Update tab buttons
+                [camTab0, camTab1].forEach((tab, i) => {
+                    if (i < availableCameras.length) {
+                        tab.style.display = 'block';
+                        tab.classList.toggle('active', i === currentCameraIndex);
+                    } else {
+                        tab.style.display = 'none';
+                    }
+                });
+
+                // Show camera info
+                const camInfo = availableCameras[currentCameraIndex] || {};
+                statusEl.textContent = `Camera ${currentCameraIndex}: ${camInfo.name || 'USB Camera'}`;
+
+                PARC?.Toast?.show(`Camera ${currentCameraIndex} selected`, 'success');
+
+                // Auto-connect to camera if not already active
+                if (!cameraActive) {
+                    await toggleCamera();
+                }
+
+            } catch (e) {
+                statusEl.textContent = 'Discovery failed';
+                PARC?.Toast?.show('Camera discovery failed: ' + e.message, 'error');
+            }
+
+            discoverBtn.disabled = false;
+            discoverBtn.textContent = 'Discover';
+        }
+
+        // Camera Toggle
+        let cameraActive = false;
+        let videoStream = null;
+
+        async function toggleCamera() {
+            const placeholder = document.getElementById('camera-placeholder');
+            const canvas = document.getElementById('video-canvas');
+            const toggleBtn = document.getElementById('toggle-camera-btn');
+            const analyzeBtn = document.getElementById('analyze-btn');
+            const detectBtn = document.getElementById('detect-btn');
+
+            if (!cameraActive) {
+                try {
+                    // Use discovered camera index or default to 0
+                    const constraints = {
+                        video: {
+                            deviceId: availableCameras.length > 0 && availableCameras[currentCameraIndex]
+                                ? { exact: availableCameras[currentCameraIndex].deviceId || undefined }
+                                : undefined,
+                            width: 640,
+                            height: 480
+                        }
+                    };
+                    videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    const video = document.createElement('video');
+                    video.srcObject = videoStream;
+                    video.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+                    canvas.innerHTML = '';
+                    canvas.appendChild(video);
+                    await video.play();
+
+                    placeholder.style.display = 'none';
+                    canvas.style.display = 'block';
+                    analyzeBtn.style.display = 'block';
+                    detectBtn.style.display = 'block';
+                    toggleBtn.textContent = '{{ t('practical.disconnect_camera') }}';
+                    cameraActive = true;
+                } catch (err) {
+                    PARC?.Toast?.show(t('settings.errors.camera_access_denied'), 'error');
+                }
+            } else {
+                if (videoStream) {
+                    videoStream.getTracks().forEach(track => track.stop());
+                    videoStream = null;
+                }
+                canvas.innerHTML = '';
+                placeholder.style.display = 'flex';
+                canvas.style.display = 'none';
+                analyzeBtn.style.display = 'none';
+                detectBtn.style.display = 'none';
+                toggleBtn.textContent = '{{ t('practical.connect_camera') }}';
+                cameraActive = false;
+            }
+        }
+
+        async function analyzeImage() {
+            const canvas = document.getElementById('video-canvas');
+            const resultDiv = document.getElementById('analysis-result');
+            const video = canvas.querySelector('video');
+
+            if (!video) return;
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = video.videoWidth;
+            tempCanvas.height = video.videoHeight;
+            const ctx = tempCanvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Analyzing scene...';
+
+            try {
+                const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.8);
+                const resp = await fetch('/api/vision/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: dataUrl })
+                });
+                const data = await resp.json();
+                resultDiv.innerHTML = data.response || data.error || 'Analysis complete';
+            } catch (e) {
+                resultDiv.innerHTML = 'Vision analysis failed';
+            }
+        }
+
+        async function detectObjects() {
+            const canvas = document.getElementById('video-canvas');
+            const resultDiv = document.getElementById('detection-result');
+            const video = canvas.querySelector('video');
+
+            if (!video) {
+                PARC?.Toast?.show(t('settings.errors.camera_not_connected'), 'error');
+                return;
+            }
+
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = video.videoWidth;
+            tempCanvas.height = video.videoHeight;
+            const ctx = tempCanvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Detecting objects with YOLOE...';
+
+            try {
+                const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.8);
+                const resp = await fetch('/api/vision/yoloe/detect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: dataUrl })
+                });
+                const data = await resp.json();
+
+                if (data.error) {
+                    resultDiv.innerHTML = 'Error: ' + data.error;
+                    return;
+                }
+
+                if (data.objects && data.objects.length > 0) {
+                    let html = '<strong>DETECTED OBJECTS:</strong><br>';
+                    data.objects.forEach((obj, i) => {
+                        html += `${i + 1}. ${obj.class} (${(obj.confidence * 100).toFixed(1)}%) at [${obj.center[0].toFixed(0)}, ${obj.center[1].toFixed(0)}]<br>`;
+                    });
+                    html += `<br><strong>Scene:</strong> ${data.scene}`;
+                    resultDiv.innerHTML = html;
+
+                    // Auto-populate code with detected objects
+                    const detected = data.objects.map(o => `'${o.class}'`).join(', ');
+                    if (editor) {
+                        const currentCode = editor.getValue();
+                        editor.setValue(currentCode + `\n# Detected: ${data.count} objects - [${detected}]\n`);
+                    }
+                } else {
+                    resultDiv.innerHTML = 'No objects detected. Try adjusting camera angle.';
+                }
+            } catch (e) {
+                resultDiv.innerHTML = 'Detection failed: ' + e.message;
+            }
+        }
+
+        // Voice Recording
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+
+        async function toggleRecording() {
+            const recordBtn = document.getElementById('record-btn');
+            const indicator = document.getElementById('recording-indicator');
+
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+
+                    mediaRecorder.ondataavailable = e => {
+                        audioChunks.push(e.data);
+                    };
+
+                    mediaRecorder.onstop = async () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const reader = new FileReader();
+                        reader.onloadend = async () => {
+                            const base64 = reader.result.split(',')[1];
+                            await processVoiceCommand(base64);
+                        };
+                        reader.readAsDataURL(audioBlob);
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+
+                    mediaRecorder.start();
+                    isRecording = true;
+                    recordBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>{{ t('practical.stop_recording') }}';
+                    indicator.style.display = 'flex';
+                } catch (err) {
+                    PARC?.Toast?.show(t('settings.errors.microphone_access_denied'), 'error');
+                }
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                recordBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>{{ t('practical.start_recording') }}';
+                indicator.style.display = 'none';
+            }
+        }
+
+        async function processVoiceCommand(audioBase64) {
+            const resultDiv = document.getElementById('voice-result');
+            const executeBtn = document.getElementById('execute-cmd-btn');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Processing voice command...';
+
+            try {
+                const resp = await fetch('/api/audio/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ audio: audioBase64 })
+                });
+                const data = await resp.json();
+                resultDiv.innerHTML = `<strong>Transcribed:</strong> ${data.text || 'Could not understand'}<br><strong>Command:</strong> ${data.command || 'None'}`;
+                if (data.command && data.command !== 'none') {
+                    executeBtn.style.display = 'inline-block';
+                    executeBtn.dataset.command = JSON.stringify(data.command);
+                }
+            } catch (e) {
+                resultDiv.innerHTML = 'Voice command failed';
+            }
+        }
+
+        function executeVoiceCommand() {
+            const executeBtn = document.getElementById('execute-cmd-btn');
+            const cmdStr = executeBtn.dataset.command;
+            if (!cmdStr) return;
+
+            const cmd = JSON.parse(cmdStr);
+            let code = editor ? editor.getValue() : '';
+
+            if (cmd.action === 'move_joints') {
+                code += `\n# Voice command: Move to ${cmd.joints.map((j, i) => j + '=' + cmd.angles[i] + 'deg').join(', ')}\n`;
+                code += `manager.send_positions(${JSON.stringify(cmd.joints.reduce((a, j, i) => ({...a, [j]: cmd.angles[i]}), {}))}, speed=300)\n`;
+            } else if (cmd.action === 'pick_place') {
+                code += `\n# Voice command: Pick and place from ${cmd.from} to ${cmd.to}\n`;
+                code += `manager.pick_place('${cmd.from}', '${cmd.to}')\n`;
+            } else if (cmd.action === 'run_mode') {
+                code += `\n# Voice command: Run mode '${cmd.mode}'\n`;
+                code += `manager.run_mode('${cmd.mode}')\n`;
+            }
+
+            if (editor) {
+                editor.setValue(code);
+            }
+                PARC?.Toast?.show(t('settings.command_added_to_editor'), 'success');
+        }
+
+        // 3D Robot Viewer using RobotArm3D class
+        let robotViewer = null;
+        let syncInterval = null;
+        let isRealTimeSync = false;
+        let lastRobotJoints = null;
+
+        function init3DViewer() {
+            const container = document.getElementById('robot-canvas');
+            if (!container) return;
+
+            robotViewer = new RobotArm3D(container, {
+                width: container.clientWidth,
+                height: container.clientHeight,
+                showGrid: true,
+                showAxes: true,
+                enableOrbit: true
+            });
+
+            robotViewer.init().then(() => {
+                console.log('Robot arm 3D viewer initialized');
+                updateRobotPose({ shoulder_pan: 0, shoulder_lift: 0, elbow_flex: 0,
+                                 wrist_flex: 0, wrist_roll: 0, gripper: 0 });
+            }).catch(err => {
+                console.error('Failed to initialize 3D viewer:', err);
+            });
+        }
+
+        function updateRobotPose(joints) {
+            if (robotViewer) {
+                robotViewer.setJoints(joints);
+            }
+            fetch('/api/sim/fk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ joints })
+            }).then(r => r.json()).then(data => {
+                if (data.success && data.position) {
+                    const pos = data.position;
+                    const viewerContainer = document.getElementById('robot-viewer');
+                    const existingTag = document.getElementById('fk-position');
+                    if (existingTag) existingTag.remove();
+                    if (viewerContainer) {
+                        const overlay = viewerContainer.querySelector('.viewer-overlay');
+                        if (overlay) {
+                            const posTag = document.createElement('span');
+                            posTag.className = 'viewer-tag';
+                            posTag.id = 'fk-position';
+                            posTag.textContent = `X:${(pos[0]*1000).toFixed(0)} Y:${(pos[1]*1000).toFixed(0)} Z:${(pos[2]*1000).toFixed(0)} mm`;
+                            overlay.appendChild(posTag);
+                        }
+                    }
+                }
+            }).catch(() => {});
+        }
+
+        async function pollRobotState() {
+            if (!isRealTimeSync) return;
+
+            try {
+                const resp = await fetch('/api/robot/state');
+                const data = await resp.json();
+
+                if (data.connected && data.joints) {
+                    const joints = data.joints;
+                    lastRobotJoints = joints;
+
+                    if (robotViewer) {
+                        robotViewer.setJoints(joints);
+                    }
+
+                    const pos = data.fk_position;
+                    const viewerContainer = document.getElementById('robot-viewer');
+                    const existingTag = document.getElementById('sync-position');
+                    if (existingTag) existingTag.remove();
+                    if (viewerContainer) {
+                        const overlay = viewerContainer.querySelector('.viewer-overlay');
+                        if (overlay) {
+                            const syncTag = document.createElement('span');
+                            syncTag.className = 'viewer-tag';
+                            syncTag.id = 'sync-position';
+                            syncTag.style.color = '#00ff88';
+                            syncTag.textContent = `REAL: X:${(pos[0]*1000).toFixed(0)} Y:${(pos[1]*1000).toFixed(0)} Z:${(pos[2]*1000).toFixed(0)} mm`;
+                            overlay.appendChild(syncTag);
+                        }
+                    }
+
+                    const syncIndicator = document.getElementById('sync-indicator');
+                    if (syncIndicator) {
+                        syncIndicator.textContent = '● SYNC';
+                        syncIndicator.style.color = '#00ff88';
+                    }
+                }
+            } catch (e) {
+                console.error('Poll robot state error:', e);
+            }
+        }
+
+        function startRealTimeSync() {
+            if (syncInterval) return;
+            isRealTimeSync = true;
+            syncInterval = setInterval(pollRobotState, 100); // 10Hz update rate
+            console.log('Real-time robot sync started');
+        }
+
+        function stopRealTimeSync() {
+            if (syncInterval) {
+                clearInterval(syncInterval);
+                syncInterval = null;
+            }
+            isRealTimeSync = false;
+            const syncIndicator = document.getElementById('sync-indicator');
+            if (syncIndicator) {
+                syncIndicator.textContent = '○ SYNC';
+                syncIndicator.style.color = '#888';
+            }
+            console.log('Real-time robot sync stopped');
+        }
+
+        async function runPickPlaceSim() {
+            const btn = document.getElementById('btn-pick-place');
+            if (btn) btn.disabled = true;
+
+            const pickStr = document.getElementById('pick-position')?.value || '-0.05, 0.08, 0.05';
+            const placeStr = document.getElementById('place-position')?.value || '0.05, -0.08, 0.05';
+            const duration = parseFloat(document.getElementById('move-duration')?.value) || 2.0;
+
+            const parsePosition = (str) => {
+                const parts = str.split(',').map(s => parseFloat(s.trim()));
+                return { x: parts[0] || 0, y: parts[1] || 0, z: parts[2] || 0 };
+            };
+
+            const pickPos = parsePosition(pickStr);
+            const placePos = parsePosition(placeStr);
+
+            if (!robotViewer) {
+                PARC?.Toast?.show('3D viewer not initialized', 'error');
+                if (btn) btn.disabled = false;
+                return;
+            }
+
+            try {
+                // Add cubes at pick and place positions
+                robotViewer.addCube(pickPos, 0.026, 0xff4444, 'pick_cube');
+                robotViewer.addCube(placePos, 0.026, 0x44ff44, 'place_cube');
+
+                // Show progress
+                const progressDiv = document.getElementById('sim-progress');
+                const progressFill = document.getElementById('progress-fill');
+                const progressText = document.getElementById('progress-text');
+                if (progressDiv) progressDiv.style.display = 'block';
+
+                const updateProgress = (info) => {
+                    const pct = Math.round((info.elapsed / info.totalDuration) * 100);
+                    if (progressFill) progressFill.style.width = pct + '%';
+                    if (progressText) progressText.textContent = pct + '%';
+                };
+
+                // Step 1: Move to pre-pick position
+                const prePickPos = { x: pickPos.x, y: pickPos.y, z: Math.max(pickPos.z, 0.1) };
+                const prePickIK = await fetch('/api/sim/ik', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ position: [prePickPos.x, prePickPos.y, prePickPos.z] })
+                }).then(r => r.json());
+
+                if (prePickIK.success) {
+                    const traj1 = await fetch('/api/sim/trajectory', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            waypoints: [
+                                { joints: lastRobotJoints || { shoulder_pan: 0, shoulder_lift: 0, elbow_flex: 0, wrist_flex: 0, wrist_roll: 0, gripper: 50 }, duration: duration },
+                                { joints: { ...prePickIK.joints, gripper: 50 }, duration: duration }
+                            ]
+                        })
+                    }).then(r => r.json());
+
+                    await new Promise(resolve => {
+                        robotViewer.executeTrajectory(traj1.trajectory, updateProgress, resolve);
+                    });
+                }
+
+                // Step 2: Move to pick position
+                const pickIK = await fetch('/api/sim/ik', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ position: [pickPos.x, pickPos.y, pickPos.z] })
+                }).then(r => r.json());
+
+                if (pickIK.success) {
+                    const traj2 = await fetch('/api/sim/trajectory', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            waypoints: [
+                                { joints: { ...prePickIK.joints, gripper: 50 }, duration: duration * 0.5 },
+                                { joints: { ...pickIK.joints, gripper: 50 }, duration: duration * 0.5 }
+                            ]
+                        })
+                    }).then(r => r.json());
+
+                    await new Promise(resolve => {
+                        robotViewer.executeTrajectory(traj2.trajectory, updateProgress, resolve);
+                    });
+                }
+
+                // Step 3: Grip (close gripper)
+                const gripIK = await fetch('/api/sim/ik', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ position: [pickPos.x, pickPos.y, pickPos.z] })
+                }).then(r => r.json());
+
+                if (gripIK.success) {
+                    const traj3 = await fetch('/api/sim/trajectory', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            waypoints: [
+                                { joints: { ...gripIK.joints, gripper: 5 }, duration: 0.5 }
+                            ]
+                        })
+                    }).then(r => r.json());
+
+                    await new Promise(resolve => {
+                        robotViewer.executeTrajectory(traj3.trajectory, updateProgress, resolve);
+                    });
+                }
+
+                // Step 4: Move up
+                const upIK = await fetch('/api/sim/ik', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ position: [pickPos.x, pickPos.y, prePickPos.z] })
+                }).then(r => r.json());
+
+                if (upIK.success) {
+                    const traj4 = await fetch('/api/sim/trajectory', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            waypoints: [
+                                { joints: { ...upIK.joints, gripper: 5 }, duration: duration }
+                            ]
+                        })
+                    }).then(r => r.json());
+
+                    await new Promise(resolve => {
+                        robotViewer.executeTrajectory(traj4.trajectory, updateProgress, resolve);
+                    });
+                }
+
+                // Step 5: Move to pre-place
+                const prePlacePos = { x: placePos.x, y: placePos.y, z: Math.max(placePos.z, 0.1) };
+                const prePlaceIK = await fetch('/api/sim/ik', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ position: [prePlacePos.x, prePlacePos.y, prePlacePos.z] })
+                }).then(r => r.json());
+
+                if (prePlaceIK.success) {
+                    const traj5 = await fetch('/api/sim/trajectory', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            waypoints: [
+                                { joints: { ...upIK.joints, gripper: 5 }, duration: duration },
+                                { joints: { ...prePlaceIK.joints, gripper: 5 }, duration: duration }
+                            ]
+                        })
+                    }).then(r => r.json());
+
+                    await new Promise(resolve => {
+                        robotViewer.executeTrajectory(traj5.trajectory, updateProgress, resolve);
+                    });
+                }
+
+                // Step 6: Move to place and release
+                const placeIK = await fetch('/api/sim/ik', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ position: [placePos.x, placePos.y, placePos.z] })
+                }).then(r => r.json());
+
+                if (placeIK.success) {
+                    const traj6 = await fetch('/api/sim/trajectory', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            waypoints: [
+                                { joints: { ...placeIK.joints, gripper: 5 }, duration: duration * 0.5 },
+                                { joints: { ...placeIK.joints, gripper: 50 }, duration: duration * 0.5 }
+                            ]
+                        })
+                    }).then(r => r.json());
+
+                    await new Promise(resolve => {
+                        robotViewer.executeTrajectory(traj6.trajectory, updateProgress, resolve);
+                    });
+
+                    // Move cube to place position
+                    robotViewer.moveCube('pick_cube', placePos, duration);
+                }
+
+                PARC?.Toast?.show('Pick & Place simulation complete!', 'success');
+
+            } catch (e) {
+                console.error('Pick & Place error:', e);
+                PARC?.Toast?.show('Simulation error: ' + e.message, 'error');
+            } finally {
+                if (btn) btn.disabled = false;
+                const progressDiv = document.getElementById('sim-progress');
+                if (progressDiv) progressDiv.style.display = 'none';
+            }
+        }
+
+        function clearSimulation() {
+            if (robotViewer) {
+                robotViewer.clearTrajectoryPath();
+                robotViewer.removeObject('pick_cube');
+                robotViewer.removeObject('place_cube');
+                robotViewer.clearSimulatedObjects();
+            }
+            const progressDiv = document.getElementById('sim-progress');
+            const progressFill = document.getElementById('progress-fill');
+            const progressText = document.getElementById('progress-text');
+            if (progressDiv) progressDiv.style.display = 'none';
+            if (progressFill) progressFill.style.width = '0%';
+            if (progressText) progressText.textContent = '0%';
+        }
+
+        async function detectScene() {
+            const btn = document.getElementById('btn-detect-scene');
+            if (btn) btn.disabled = true;
+
+            try {
+                // Set up scene with cubes if not already done
+                if (robotViewer && !robotViewer.simulatedObjects?.length) {
+                    robotViewer.setupPickAndPlace([
+                        { name: 'red_cube', color: 'red', shape: 'cube', position: { x: -0.05, y: 0.05, z: 0.025 } },
+                        { name: 'blue_cube', color: 'blue', shape: 'cube', position: { x: 0.02, y: -0.03, z: 0.025 } },
+                        { name: 'green_cube', color: 'green', shape: 'cube', position: { x: 0.05, y: 0.08, z: 0.025 } }
+                    ], { x: 0.12, y: 0, z: 0.05 });
+                }
+
+                // Call detect endpoint
+                const resp = await fetch('/api/vision/detect_scene', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                const data = await resp.json();
+
+                // Display detections
+                const detectionsDiv = document.getElementById('vision-detections');
+                if (detectionsDiv && data.detections) {
+                    detectionsDiv.innerHTML = data.detections.map(d =>
+                        `<span class="detection-tag" style="background:${getColorForClass(d.class)}">${d.class} (${(d.confidence * 100).toFixed(0)}%)</span>`
+                    ).join(' ');
+                }
+
+                // Store detections for later use
+                window.currentDetections = data.detections || [];
+
+                PARC?.Toast?.show(`Detected ${data.count} objects`, 'success');
+            } catch (e) {
+                console.error('Detect error:', e);
+                PARC?.Toast?.show('Detection error: ' + e.message, 'error');
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        function getColorForClass(className) {
+            if (className.includes('red')) return '#ff4444';
+            if (className.includes('blue')) return '#4444ff';
+            if (className.includes('green')) return '#44ff44';
+            if (className.includes('yellow')) return '#ffff44';
+            return '#888888';
+        }
+
+        async function executeAICommand() {
+            const commandInput = document.getElementById('ai-command');
+            const command = commandInput?.value.trim();
+            if (!command) {
+                PARC?.Toast?.show('Enter a command', 'warning');
+                return;
+            }
+
+            const btn = document.querySelector('#ai-command + button');
+            if (btn) btn.disabled = true;
+
+            try {
+                // Get current detections or detect if none
+                let detections = window.currentDetections || [];
+                if (!detections.length) {
+                    await detectScene();
+                    detections = window.currentDetections || [];
+                }
+
+                // Call AI planning endpoint
+                const resp = await fetch('/api/ai/plan_pick_place', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        command: command,
+                        detected_objects: detections,
+                        scene: {
+                            bin: { position: [0.12, 0, 0.05] }
+                        }
+                    })
+                });
+                const data = await resp.json();
+
+                if (!data.ok) {
+                    PARC?.Toast?.show(data.error || 'Planning failed', 'error');
+                    return;
+                }
+
+                // Display plan
+                const planDiv = document.getElementById('vision-plan');
+                const stepsDiv = document.getElementById('plan-steps');
+                if (planDiv && stepsDiv && data.plan) {
+                    planDiv.style.display = 'block';
+                    stepsDiv.innerHTML = data.plan.steps.map((step, i) =>
+                        `<div class="plan-step">${i + 1}. ${step.description || step.action}</div>`
+                    ).join('');
+                }
+
+                // Execute plan
+                await executePlan(data.plan);
+
+            } catch (e) {
+                console.error('AI command error:', e);
+                PARC?.Toast?.show('Command error: ' + e.message, 'error');
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        async function executePlan(plan) {
+            if (!plan || !plan.steps || !robotViewer) return;
+
+            const progressDiv = document.getElementById('sim-progress');
+            const progressFill = document.getElementById('progress-fill');
+            const progressText = document.getElementById('progress-text');
+            if (progressDiv) progressDiv.style.display = 'block';
+
+            for (let i = 0; i < plan.steps.length; i++) {
+                const step = plan.steps[i];
+                const pct = Math.round((i / plan.steps.length) * 100);
+                if (progressFill) progressFill.style.width = pct + '%';
+                if (progressText) progressText.textContent = `${pct}% - ${step.description || step.action}`;
+
+                if (step.action === 'move_to') {
+                    // Get IK for position
+                    const ikResp = await fetch('/api/sim/ik', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ position: step.position })
+                    });
+                    const ikData = await ikResp.json();
+
+                    if (ikData.success) {
+                        // Generate trajectory
+                        const trajResp = await fetch('/api/sim/trajectory', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                waypoints: [
+                                    { joints: lastRobotJoints || { shoulder_pan: 0, shoulder_lift: 0, elbow_flex: 0, wrist_flex: 0, wrist_roll: 0, gripper: step.gripper || 50 }, duration: 0.5 },
+                                    { joints: { ...ikData.joints, gripper: step.gripper || 50 }, duration: step.duration || 2.0 }
+                                ]
+                            })
+                        });
+                        const trajData = await trajResp.json();
+
+                        // Execute
+                        await new Promise(resolve => {
+                            robotViewer.executeTrajectory(trajData.trajectory, null, resolve);
+                        });
+
+                        lastRobotJoints = { ...ikData.joints, gripper: step.gripper || 50 };
+                    }
+                } else if (step.action === 'grip' || step.action === 'release') {
+                    // Just update gripper in viewer
+                    if (robotViewer) {
+                        robotViewer.setJoints({ gripper: step.gripper });
+                    }
+                    await new Promise(r => setTimeout(r, step.duration * 1000));
+                }
+            }
+
+            // Complete
+            if (progressFill) progressFill.style.width = '100%';
+            if (progressText) progressText.textContent = 'Complete!';
+            PARC?.Toast?.show('Pick & Place complete!', 'success');
+
+            setTimeout(() => {
+                if (progressDiv) progressDiv.style.display = 'none';
+            }, 2000);
+        }
+
+        // Gripper Camera Functions
+        let gripperCamActive = false;
+        let gripperCamInterval = null;
+
+        async function toggleGripperCam() {
+            const btn = document.getElementById('btn-gripper-cam');
+            const camSelect = document.getElementById('gripper-cam-select');
+            const camIndex = parseInt(camSelect?.value || 1);
+
+            if (!gripperCamActive) {
+                // Start gripper camera
+                const resp = await fetch('/gripper_cam/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cam_index: camIndex })
+                });
+                const data = await resp.json();
+
+                if (data.ok) {
+                    gripperCamActive = true;
+                    if (btn) btn.textContent = '⏹ Stop';
+
+                    // Show video feed
+                    const img = document.getElementById('gripper-cam-feed');
+                    const placeholder = document.getElementById('gripper-cam-placeholder');
+                    if (img) {
+                        img.src = '/gripper_cam/video_feed';
+                        img.style.display = 'block';
+                    }
+                    if (placeholder) placeholder.style.display = 'none';
+
+                    // Start polling for detections
+                    pollGripperDetections();
+                }
+            } else {
+                // Stop gripper camera
+                await fetch('/gripper_cam/stop', { method: 'POST' });
+                gripperCamActive = false;
+                if (btn) btn.textContent = '📷 Start';
+
+                // Hide video feed
+                const img = document.getElementById('gripper-cam-feed');
+                const placeholder = document.getElementById('gripper-cam-placeholder');
+                if (img) {
+                    img.src = '';
+                    img.style.display = 'none';
+                }
+                if (placeholder) placeholder.style.display = 'flex';
+
+                if (gripperCamInterval) {
+                    clearInterval(gripperCamInterval);
+                    gripperCamInterval = null;
+                }
+            }
+        }
+
+        async function pollGripperDetections() {
+            if (!gripperCamActive) return;
+
+            try {
+                const resp = await fetch('/gripper_cam/detect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ conf: 0.3 })
+                });
+                const data = await resp.json();
+
+                if (data.detections && data.detections.length > 0) {
+                    const detectionsDiv = document.getElementById('gripper-detections');
+                    if (detectionsDiv) {
+                        detectionsDiv.innerHTML = data.detections.map(d =>
+                            `<span class="detection-tag" style="background:${getColorForClass(d.class)}">${d.class} (${(d.confidence * 100).toFixed(0)}%)</span>`
+                        ).join(' ');
+                    }
+
+                    // Store for AI planning
+                    window.gripperDetections = data.detections;
+                }
+            } catch (e) {
+                console.error('Gripper detect error:', e);
+            }
+
+            // Continue polling
+            if (gripperCamActive) {
+                gripperCamInterval = setTimeout(pollGripperDetections, 200);
+            }
+        }
+
+        async function getGripperCameraFrame() {
+            try {
+                const resp = await fetch('/gripper_cam/frame');
+                if (resp.ok) {
+                    const blob = await resp.blob();
+                    return URL.createObjectURL(blob);
+                }
+            } catch (e) {
+                console.error('Get frame error:', e);
+            }
+            return null;
+        }
+
+        window.addEventListener('load', () => {
+            initCodeEditor();
+            init3DViewer();
+            initPiecesGrid();
+            updateAIStatus();
+            setInterval(updateAIStatus, 30000);
+
+            // Start real-time sync after a short delay
+            setTimeout(() => {
+                startRealTimeSync();
+            }, 1000);
+        });
+
+        window.addEventListener('resize', () => {
+            const container = document.getElementById('robot-canvas');
+            if (container && robotViewer) {
+                robotViewer.onResize();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,402 @@
+{% extends 'base.html' %}
+{% block title %}PRL — Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── Dashboard layout ──────────────────────────────────────────────────── */
+    .dash {
+        min-height: calc(100vh - var(--hdr-h));
+        display: grid;
+        grid-template-rows: 1fr;
+        background: var(--bg);
+        /* Subtle dot grid */
+        background-image: radial-gradient(circle, #1c2540 1px, transparent 1px);
+        background-size: 28px 28px;
+        background-position: center center;
+    }
+
+    .dash-inner {
+        padding: 48px 52px 60px;
+        max-width: 1200px;
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    /* ── Section header ────────────────────────────────────────────────────── */
+    .dash-header {
+        margin-bottom: 36px;
+    }
+
+    .dash-eyebrow {
+        font-family: var(--dm-mono);
+        font-size: 10px;
+        font-weight: 400;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        margin-bottom: 6px;
+    }
+
+    .dash-title {
+        font-family: var(--ibm);
+        font-size: 22px;
+        font-weight: 600;
+        color: var(--text);
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+    }
+
+    /* ── Module grid ───────────────────────────────────────────────────────── */
+    .mod-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+    }
+
+    @media (max-width: 960px)  { .mod-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 600px)  { .mod-grid { grid-template-columns: 1fr; } .dash-inner { padding: 24px; } }
+
+    /* ── Module card ───────────────────────────────────────────────────────── */
+    .mcard {
+        position: relative;
+        background: var(--bg2);
+        border: 1px solid #1e2535;
+        border-radius: 8px;
+        padding: 26px 26px 22px;
+        display: block;
+        text-decoration: none;
+        color: inherit;
+        transition: border-color 0.18s, background 0.18s, transform 0.18s, box-shadow 0.18s;
+        overflow: hidden;
+        cursor: pointer;
+    }
+
+    .mcard::after {
+        content: '';
+        position: absolute;
+        bottom: 0; left: 0; right: 0;
+        height: 1px;
+        background: var(--mc-accent, var(--amber));
+        transform: scaleX(0);
+        transition: transform 0.22s cubic-bezier(0.16,1,0.3,1);
+        transform-origin: left;
+    }
+
+    .mcard:hover {
+        background: var(--bg3);
+        border-color: #2a3347;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+
+    .mcard:hover::after { transform: scaleX(1); }
+
+    .mcard:focus-visible {
+        outline: 2px solid var(--mc-accent, var(--amber));
+        outline-offset: 2px;
+    }
+
+    /* Icon */
+    .mc-icon {
+        width: 36px; height: 36px;
+        border-radius: 7px;
+        background: var(--mc-dim, rgba(245,166,35,0.08));
+        display: flex; align-items: center; justify-content: center;
+        margin-bottom: 18px;
+    }
+
+    .mc-icon svg {
+        width: 17px; height: 17px;
+        stroke: var(--mc-accent, var(--amber));
+        fill: none;
+        stroke-width: 1.75;
+        stroke-linecap: round; stroke-linejoin: round;
+    }
+
+    .mc-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 7px;
+    }
+
+    .mc-title {
+        font-family: var(--ibm);
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+        letter-spacing: -0.01em;
+        line-height: 1.2;
+    }
+
+    .mc-tag {
+        font-family: var(--dm-mono);
+        font-size: 9px;
+        font-weight: 400;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 2px 7px;
+        border-radius: 2px;
+        border: 1px solid;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    .mc-tag.avail  { color: var(--green);  border-color: rgba(16,185,129,0.3);  background: rgba(16,185,129,0.05); }
+    .mc-tag.run    { color: var(--green);  border-color: rgba(16,185,129,0.4);  background: rgba(16,185,129,0.1); }
+    .mc-tag.idle   { color: var(--text-dim); border-color: var(--border); background: transparent; }
+    .mc-tag.unavail{ color: var(--red);    border-color: rgba(239,68,68,0.3);   background: rgba(239,68,68,0.05); }
+
+    .mc-desc {
+        font-family: var(--ibm);
+        font-size: 12px;
+        color: var(--text-muted);
+        line-height: 1.65;
+        margin-bottom: 22px;
+    }
+
+    .mc-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .mc-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-family: var(--dm-mono);
+        font-size: 10px;
+        font-weight: 400;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--mc-accent, var(--amber));
+        transition: gap 0.18s;
+    }
+
+    .mcard:hover .mc-action { gap: 9px; }
+
+    .mc-action svg {
+        width: 11px; height: 11px;
+        stroke: currentColor; fill: none;
+        stroke-width: 2.5;
+        stroke-linecap: round; stroke-linejoin: round;
+        transition: transform 0.18s;
+    }
+
+    .mcard:hover .mc-action svg { transform: translateX(3px); }
+
+    .mc-kbd {
+        font-family: var(--dm-mono);
+        font-size: 9px;
+        color: var(--text-dim);
+        background: var(--bg4);
+        border: 1px solid var(--border);
+        padding: 2px 6px;
+        border-radius: 3px;
+    }
+
+    /* Viewer process badge */
+    .mc-proc {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-family: var(--dm-mono);
+        font-size: 10px;
+        color: var(--text-dim);
+        transition: color 0.3s;
+    }
+
+    .mc-proc-dot {
+        width: 5px; height: 5px;
+        border-radius: 50%;
+        background: #334155;
+        flex-shrink: 0;
+        transition: background 0.3s, box-shadow 0.3s;
+    }
+
+    .mc-proc.live { color: var(--green); }
+    .mc-proc.live .mc-proc-dot {
+        background: var(--green);
+        box-shadow: 0 0 5px rgba(16,185,129,0.6);
+    }
+
+    /* Color map */
+    .mcard[data-c="amber"]  { --mc-accent: #F5A623; --mc-dim: rgba(245,166,35,0.07); }
+    .mcard[data-c="blue"]   { --mc-accent: #4f8ef7; --mc-dim: rgba(79,142,247,0.07); }
+    .mcard[data-c="green"]  { --mc-accent: #22d07a; --mc-dim: rgba(34,208,122,0.07); }
+    .mcard[data-c="violet"] { --mc-accent: #9b79f8; --mc-dim: rgba(155,121,248,0.07); }
+    .mcard[data-c="slate"]  { --mc-accent: #7c8fa8; --mc-dim: rgba(124,143,168,0.07); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dash">
+    <div class="dash-inner">
+        <div class="dash-header">
+            <div class="dash-eyebrow">PARC Robotics Lab / SO-101 Controller</div>
+            <div class="dash-title">Select a module</div>
+        </div>
+
+        <div class="mod-grid">
+
+            <!-- Learn -->
+            <a href="/learn" class="mcard" data-c="blue" aria-label="Open Learn module">
+                <div class="mc-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                </div>
+                <div class="mc-head">
+                    <span class="mc-title">{{ t('cards.learn.title') }}</span>
+                    <span class="mc-tag avail">Available</span>
+                </div>
+                <p class="mc-desc">{{ t('cards.learn.desc') }}</p>
+                <div class="mc-footer">
+                    <span class="mc-action">
+                        Open
+                        <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+                    </span>
+                    <span class="mc-kbd" title="Keyboard shortcut">L</span>
+                </div>
+            </a>
+
+            <!-- Practical -->
+            <a href="/practical" class="mcard" data-c="green" aria-label="Open Practical module">
+                <div class="mc-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                </div>
+                <div class="mc-head">
+                    <span class="mc-title">{{ t('cards.practical.title') }}</span>
+                    <span class="mc-tag avail">Available</span>
+                </div>
+                <p class="mc-desc">{{ t('cards.practical.desc') }}</p>
+                <div class="mc-footer">
+                    <span class="mc-action">
+                        Open
+                        <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+                    </span>
+                    <span class="mc-kbd" title="Keyboard shortcut">P</span>
+                </div>
+            </a>
+
+            <!-- Play -->
+            <a href="/play" class="mcard" data-c="amber" aria-label="Open Play module">
+                <div class="mc-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01M17 12h.01"/><path d="M5 10v4M7 12H3"/></svg>
+                </div>
+                <div class="mc-head">
+                    <span class="mc-title">{{ t('cards.play.title') }}</span>
+                    <span class="mc-tag idle" id="play-tag">Idle</span>
+                </div>
+                <p class="mc-desc">{{ t('cards.play.desc') }}</p>
+                <div class="mc-footer">
+                    <span class="mc-action">
+                        Control
+                        <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+                    </span>
+                    <span class="mc-kbd" title="Keyboard shortcut">X</span>
+                </div>
+            </a>
+
+            <!-- MuJoCo Viewer -->
+            <div class="mcard" data-c="violet"
+                 onclick="dashLaunchViewer(event)"
+                 role="button" tabindex="0"
+                 aria-label="Launch MuJoCo Viewer"
+                 onkeydown="if(event.key==='Enter'||event.key===' ')dashLaunchViewer(event)">
+                <div class="mc-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                </div>
+                <div class="mc-head">
+                    <span class="mc-title">MuJoCo Viewer</span>
+                    <span class="mc-tag idle" id="viewer-tag">Stopped</span>
+                </div>
+                <p class="mc-desc">Native desktop physics viewer for the SO-101. Drag joints to drive the real arm in real time.</p>
+                <div class="mc-footer">
+                    <span class="mc-action" id="viewer-action">
+                        Launch
+                        <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+                    </span>
+                    <span class="mc-kbd" title="Keyboard shortcut">M</span>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <a href="/settings" class="mcard" data-c="slate" aria-label="Open Settings">
+                <div class="mc-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </div>
+                <div class="mc-head">
+                    <span class="mc-title">{{ t('cards.settings.title') }}</span>
+                    <span class="mc-tag avail">Available</span>
+                </div>
+                <p class="mc-desc">{{ t('cards.settings.desc') }}</p>
+                <div class="mc-footer">
+                    <span class="mc-action">
+                        Configure
+                        <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+                    </span>
+                    <span class="mc-kbd" title="Keyboard shortcut">S</span>
+                </div>
+            </a>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    /* Viewer card status */
+    const viewerTag    = document.getElementById('viewer-tag');
+    const viewerAction = document.getElementById('viewer-action');
+    let   dashVRun = false;
+
+    async function dashCheckViewer() {
+        try {
+            const { running } = await (await fetch('/api/viewer/status')).json();
+            dashVRun = running;
+            viewerTag.className = 'mc-tag ' + (running ? 'run' : 'idle');
+            viewerTag.textContent = running ? 'Running' : 'Stopped';
+        } catch {}
+    }
+
+    async function dashLaunchViewer(e) {
+        e.preventDefault();
+        if (dashVRun) { PRL.toast('Viewer already running', 'info'); return; }
+        viewerTag.textContent = 'Starting…';
+        try {
+            const { ok, error } = await (await fetch('/api/viewer/start', { method:'POST' })).json();
+            if (ok) {
+                dashVRun = true;
+                viewerTag.className = 'mc-tag run';
+                viewerTag.textContent = 'Running';
+                PRL.toast('MuJoCo viewer launched', 'ok');
+            } else {
+                viewerTag.className = 'mc-tag idle';
+                viewerTag.textContent = 'Stopped';
+                PRL.toast('Launch failed: ' + (error || 'unknown'), 'err');
+            }
+        } catch(err) {
+            viewerTag.className = 'mc-tag idle';
+            viewerTag.textContent = 'Stopped';
+            PRL.toast('Error: ' + err, 'err');
+        }
+    }
+
+    /* Update Play card tag based on connection state */
+    (async () => {
+        try {
+            const d = await (await fetch('/api/status')).json();
+            const tag = document.getElementById('play-tag');
+            if (d.connected) {
+                tag.className = 'mc-tag avail';
+                tag.textContent = 'Ready';
+            }
+        } catch {}
+    })();
+
+    dashCheckViewer();
+    setInterval(dashCheckViewer, 5000);
+</script>
+{% endblock %}

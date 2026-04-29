@@ -1,0 +1,1448 @@
+{% extends 'base.html' %}
+{% block title %}Settings — PRL{% endblock %}
+{% block extra_css %}
+<style>
+        .settings-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        .settings-header {
+            margin-bottom: 40px;
+        }
+
+        .settings-header h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .settings-header p {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .settings-section {
+            margin-bottom: 40px;
+        }
+
+        .settings-section-title {
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            margin-bottom: 12px;
+            transition: all 0.2s;
+        }
+
+        .setting-row:hover {
+            border-color: var(--border2);
+        }
+
+        .setting-info h4 {
+            font-family: var(--mono);
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .setting-info p {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Language Selector */
+        .lang-options {
+            display: flex;
+            gap: 8px;
+        }
+
+        .lang-option {
+            padding: 8px 16px;
+            background: var(--bg4);
+            border: 1px solid var(--border);
+            border-radius: var(--r);
+            color: var(--text-muted);
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .lang-option:hover {
+            border-color: var(--border2);
+            color: var(--text);
+        }
+
+        .lang-option.active {
+            background: var(--blue-dim);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        /* Theme Colors */
+        .theme-options {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .theme-option {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .theme-option:hover {
+            transform: scale(1.1);
+        }
+
+        .theme-option.active {
+            border-color: var(--text);
+            box-shadow: 0 0 0 2px var(--bg3);
+        }
+
+        .theme-option::after {
+            content: attr(data-label);
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .theme-option:hover::after {
+            opacity: 1;
+        }
+
+        /* Toggle Switch */
+        .toggle {
+            position: relative;
+            width: 48px;
+            height: 26px;
+            background: var(--bg4);
+            border: 1px solid var(--border);
+            border-radius: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .toggle::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 18px;
+            height: 18px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+
+        .toggle.active {
+            background: var(--blue-dim);
+            border-color: var(--blue);
+        }
+
+        .toggle.active::after {
+            left: 25px;
+            background: var(--blue);
+        }
+
+        /* Workflow Diagram */
+        .workflow-section {
+            margin-bottom: 40px;
+        }
+
+        .workflow-diagram {
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            overflow-x: auto;
+        }
+
+        .workflow-title {
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .workflow-flow {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 900px;
+            padding: 10px 0;
+        }
+
+        .workflow-node {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            min-width: 120px;
+        }
+
+        .workflow-box {
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 600;
+            text-align: center;
+            border: 2px solid;
+            min-width: 100px;
+        }
+
+        .workflow-box.input {
+            background: var(--blue-dim);
+            border-color: var(--blue);
+            color: var(--blue);
+        }
+
+        .workflow-box.process {
+            background: var(--green-dim, rgba(16, 185, 129, 0.1));
+            border-color: var(--green, #10b981);
+            color: var(--green, #10b981);
+        }
+
+        .workflow-box.ai {
+            background: rgba(139, 92, 246, 0.1);
+            border-color: var(--purple, #8b5cf6);
+            color: var(--purple, #8b5cf6);
+        }
+
+        .workflow-box.output {
+            background: rgba(245, 158, 11, 0.1);
+            border-color: var(--yellow, #f59e0b);
+            color: var(--yellow, #f59e0b);
+        }
+
+        .workflow-box.data {
+            background: rgba(14, 165, 233, 0.1);
+            border-color: var(--cyan, #0ea5e9);
+            color: var(--cyan, #0ea5e9);
+        }
+
+        .workflow-box .port {
+            font-size: 9px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .workflow-arrow {
+            color: var(--text-dim);
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .workflow-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .workflow-row-label {
+            width: 80px;
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .workflow-vertical-arrow {
+            color: var(--text-dim);
+            font-size: 18px;
+            margin: 8px 0;
+        }
+
+        /* Flow Labels */
+        .flow-labels {
+            display: grid;
+            grid-template-columns: 80px 1fr;
+            gap: 8px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .flow-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg4);
+            border-radius: 6px;
+            font-size: 11px;
+            margin-bottom: 8px;
+        }
+
+        .flow-label-badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: var(--mono);
+            font-size: 9px;
+            font-weight: 700;
+        }
+
+        .flow-label-badge.stt { background: var(--blue-dim); color: var(--blue); }
+        .flow-label-badge.tts { background: rgba(245, 158, 11, 0.2); color: var(--yellow, #f59e0b); }
+        .flow-label-badge.vision { background: rgba(16, 185, 129, 0.2); color: var(--green, #10b981); }
+        .flow-label-badge.chat { background: rgba(139, 92, 246, 0.2); color: var(--purple, #8b5cf6); }
+
+        /* Port List */
+        .port-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .port-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--bg4);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .port-number {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: var(--blue-dim);
+            color: var(--blue);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--mono);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .port-info h5 {
+            font-family: var(--mono);
+            font-size: 12px;
+            margin-bottom: 2px;
+        }
+
+        .port-info p {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        /* Voice Settings */
+        .voice-section {
+            margin-top: 40px;
+        }
+
+        .voice-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .voice-card {
+            padding: 16px;
+            background: var(--bg4);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .voice-card:hover {
+            border-color: var(--blue);
+            background: var(--bg3);
+        }
+
+        .voice-card.selected {
+            border-color: var(--blue);
+            background: var(--blue-dim);
+        }
+
+        .voice-card.selected::after {
+            content: '✓';
+            float: right;
+            color: var(--blue);
+            font-weight: bold;
+        }
+
+        .voice-card h5 {
+            font-family: var(--mono);
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+
+        .voice-card p {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .voice-lang {
+            display: inline-block;
+            padding: 2px 8px;
+            background: var(--bg2);
+            border-radius: 4px;
+            font-size: 10px;
+            font-family: var(--mono);
+            color: var(--text-muted);
+        }
+
+        .voice-preview {
+            margin-top: 12px;
+            padding: 12px;
+            background: var(--bg3);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .voice-preview-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .voice-preview-btn {
+            width: 100%;
+            padding: 10px;
+            background: var(--blue);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-family: var(--mono);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .voice-preview-btn:hover {
+            background: var(--blue-dark);
+        }
+
+        .voice-preview-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .voice-download-progress {
+            margin-top: 8px;
+            height: 4px;
+            background: var(--bg4);
+            border-radius: 2px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .voice-download-progress.active {
+            display: block;
+        }
+
+        .voice-download-progress-bar {
+            height: 100%;
+            background: var(--blue);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        /* Tuning Sliders */
+        .voice-tuning {
+            margin-top: 24px;
+            padding: 20px;
+            background: var(--bg4);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .voice-tuning-title {
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        .tuning-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .tuning-label {
+            width: 120px;
+            font-size: 12px;
+            color: var(--text);
+        }
+
+        .tuning-slider {
+            flex: 1;
+            height: 6px;
+            background: var(--bg2);
+            border-radius: 3px;
+            appearance: none;
+            cursor: pointer;
+        }
+
+        .tuning-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--blue);
+            border: 2px solid var(--bg3);
+            cursor: grab;
+        }
+
+        .tuning-value {
+            width: 50px;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--blue);
+            text-align: right;
+        }
+
+        /* Buttons */
+        .btn-save {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 12px 24px;
+            background: var(--blue);
+            color: #fff;
+            border: none;
+            border-radius: var(--r);
+            font-family: var(--mono);
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 16px var(--blue-glow);
+            transition: all 0.2s;
+            z-index: 100;
+        }
+
+        .btn-save:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px var(--blue-glow);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 420px;
+            width: 90%;
+            transform: scale(0.9) translateY(20px);
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1) translateY(0);
+        }
+
+        .modal-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--blue-dim);
+            color: var(--blue);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .modal h3 {
+            font-size: 18px;
+            margin-bottom: 12px;
+        }
+
+        .modal p {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+    </style>
+    <script>
+        window.__TRANSLATIONS__ = {{ en_json | tojson }};
+        window.__CURRENT_LANG__ = "{{ lang }}";
+    </script>
+{% endblock %}
+{% block content %}
+    <main style="height: calc(100vh - var(--hdr-h)); overflow-y: auto; padding: 40px;">
+        <div class="settings-container">
+            <div class="settings-header">
+                <h1>{{ t('settings.title') }}</h1>
+                <p>{{ t('settings.subtitle') }}</p>
+            </div>
+
+            <!-- Language Section -->
+            <div class="settings-section">
+                <div class="settings-section-title">{{ t('settings.language') }}</div>
+                
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h4>{{ t('settings.lang_title') }}</h4>
+                        <p>{{ t('settings.lang_desc') }}</p>
+                    </div>
+                    <div class="lang-options">
+                        <button class="lang-option {% if lang == 'en' %}active{% endif %}" onclick="setLang('en')">English</button>
+                        <button class="lang-option {% if lang == 'fr' %}active{% endif %}" onclick="setLang('fr')">Francais</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Appearance Section -->
+            <div class="settings-section">
+                <div class="settings-section-title">{{ t('settings.appearance') }}</div>
+                
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h4>{{ t('settings.theme_title') }}</h4>
+                        <p>{{ t('settings.theme_desc') }}</p>
+                    </div>
+                    <div class="theme-options">
+                        <div class="theme-option active" style="background: #05070a;" data-color="dark" data-label="Dark" onclick="setTheme('dark')"></div>
+                        <div class="theme-option" style="background: #f8fafc;" data-color="light" data-label="Light" onclick="setTheme('light')"></div>
+                        <div class="theme-option" style="background: #0f172a;" data-color="midnight" data-label="Midnight" onclick="setTheme('midnight')"></div>
+                        <div class="theme-option" style="background: linear-gradient(135deg, #05070a 50%, #f8fafc 50%);" data-color="auto" data-label="Auto" onclick="setTheme('auto')"></div>
+                    </div>
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h4>{{ t('settings.accent_title') }}</h4>
+                        <p>{{ t('settings.accent_desc') }}</p>
+                    </div>
+                    <div class="theme-options">
+                        <div class="theme-option active" style="background: #3b82f6;" data-accent="blue" onclick="setAccent('blue')"></div>
+                        <div class="theme-option" style="background: #10b981;" data-accent="green" onclick="setAccent('green')"></div>
+                        <div class="theme-option" style="background: #f59e0b;" data-accent="yellow" onclick="setAccent('yellow')"></div>
+                        <div class="theme-option" style="background: #f97316;" data-accent="orange" onclick="setAccent('orange')"></div>
+                        <div class="theme-option" style="background: #8b5cf6;" data-accent="purple" onclick="setAccent('purple')"></div>
+                        <div class="theme-option" style="background: #ef4444;" data-accent="red" onclick="setAccent('red')"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notifications Section -->
+            <div class="settings-section">
+                <div class="settings-section-title">{{ t('settings.notifications') }}</div>
+                
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h4>{{ t('settings.notif_sound') }}</h4>
+                        <p>{{ t('settings.notif_sound_desc') }}</p>
+                    </div>
+                    <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h4>{{ t('settings.notif_toast') }}</h4>
+                        <p>{{ t('settings.notif_toast_desc') }}</p>
+                    </div>
+                    <div class="toggle active" onclick="this.classList.toggle('active')"></div>
+                </div>
+            </div>
+
+            <!-- About Section -->
+            <div class="settings-section">
+                <div class="settings-section-title">{{ t('settings.about') }}</div>
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h4>{{ t('settings.version') }}</h4>
+                        <p>PARC ROBOTICS SO-101 Controller v2.0</p>
+                    </div>
+                </div>
+
+                <!-- AI Models Status -->
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h4>{{ t('settings.ai_models_status') }}</h4>
+                        <p id="ai-models-status">{{ t('settings.loading_status') }}</p>
+                    </div>
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h4>{{ t('settings.licenses') }}</h4>
+                        <p>{{ t('modal.licenses_text')[:50] }}...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calibration Section -->
+            <div class="settings-section">
+                <div class="settings-section-title">{{ t('calibration.title') }}</div>
+                <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">{{ t('calibration.subtitle') }}</p>
+
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h4>{{ t('status.connected') }}</h4>
+                        <p id="cal-conn-status">{{ t('status.not_connected') }}</p>
+                    </div>
+                    <span class="badge" id="cal-badge">{{ t('calibration.not_calibrated') }}</span>
+                </div>
+
+                <div id="cal-controls" style="display:none;">
+                    <div class="setting-row">
+                        <div class="setting-info">
+                            <h4>{{ t('calibration.sweep_speed') }}</h4>
+                            <p style="font-size:11px;color:var(--text-muted);">{{ t('calibration.sweep_speed') }}: <span id="sweep-speed-val">800</span></p>
+                        </div>
+                        <input type="range" id="sweep-speed" min="200" max="1500" value="800" step="50" style="width:150px;" oninput="document.getElementById('sweep-speed-val').textContent=this.value">
+                    </div>
+
+                    <div style="display:flex;gap:12px;margin-bottom:20px;">
+                        <button class="btn btn-primary" id="btn-calibrate" onclick="startCalibration()">
+                            {{ t('calibration.calibrate') }}
+                        </button>
+                        <button class="btn btn-secondary" id="btn-stop-cal" onclick="stopCalibration()" style="display:none;">
+                            {{ t('calibration.stop') }}
+                        </button>
+                        <button class="btn btn-ghost" onclick="loadCalibration()">
+                            {{ t('calibration.load') }}
+                        </button>
+                        <button class="btn btn-ghost" onclick="saveCalibration()">
+                            {{ t('calibration.save') }}
+                        </button>
+                        <button class="btn btn-ghost" onclick="resetToCenter()">
+                            {{ t('calibration.reset') }}
+                        </button>
+                    </div>
+
+                    <!-- Servo Limits Table -->
+                    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:16px;">
+                        <h4 style="font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:12px;">{{ t('calibration.servo_limits') }}</h4>
+                        <div style="overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;font-size:11px;" id="servo-limits-table">
+                                <thead>
+                                    <tr style="border-bottom:1px solid var(--border);">
+                                        <th style="text-align:left;padding:8px;color:var(--text-muted);font-weight:600;">Servo</th>
+                                        <th style="text-align:center;padding:8px;color:var(--text-muted);font-weight:600;">{{ t('calibration.min_angle') }}</th>
+                                        <th style="text-align:center;padding:8px;color:var(--text-muted);font-weight:600;">{{ t('calibration.center_angle') }}</th>
+                                        <th style="text-align:center;padding:8px;color:var(--text-muted);font-weight:600;">{{ t('calibration.max_angle') }}</th>
+                                        <th style="text-align:center;padding:8px;color:var(--text-muted);font-weight:600;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="servo-limits-body">
+                                    <!-- Dynamically populated -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div id="cal-log" style="background:var(--bg4);border:1px solid var(--border);border-radius:var(--r);padding:12px;max-height:200px;overflow-y:auto;font-family:var(--mono);font-size:10px;color:var(--text-muted);">
+                        <div style="color:var(--text-dim);">{{ t('calibration.calibration_saved') }}: --</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workflow Section -->
+            <div class="workflow-section">
+                <div class="settings-section-title">{{ t('settings.workflow_title') }}</div>
+                
+                <div class="workflow-diagram">
+                    <div class="workflow-title">{{ t('settings.workflow.voice_command') }}</div>
+                    <div class="workflow-flow">
+                        <div class="workflow-node">
+                            <div class="workflow-box input">{{ t('settings.workflow.microphone') }}</div>
+                            <span class="port">{{ t('settings.workflow.audio_input') }}</span>
+                        </div>
+                        <span class="workflow-arrow">-&gt;</span>
+                        <div class="workflow-node">
+                            <div class="workflow-box process">{{ t('settings.workflow.whisper_cpp') }}</div>
+                            <span class="port">:8084 {{ t('settings.workflow.stt') }}</span>
+                        </div>
+                        <span class="workflow-arrow">-&gt;</span>
+                        <div class="workflow-node">
+                            <div class="workflow-box ai">{{ t('settings.workflow.lfm_thinking') }}</div>
+                            <span class="port">:8080 {{ t('settings.workflow.chat_rag') }}</span>
+                        </div>
+                        <span class="workflow-arrow">-&gt;</span>
+                        <div class="workflow-node">
+                            <div class="workflow-box output">{{ t('settings.workflow.robot_command') }}</div>
+                            <span class="port">{{ t('settings.workflow.action') }}</span>
+                        </div>
+                    </div>
+
+                    <div class="workflow-vertical-arrow">|</div>
+
+                    <div class="workflow-title">{{ t('settings.workflow.vision_analysis') }}</div>
+                    <div class="workflow-flow">
+                        <div class="workflow-node">
+                            <div class="workflow-box input">{{ t('settings.workflow.camera') }}</div>
+                            <span class="port">{{ t('settings.workflow.video_feed') }}</span>
+                        </div>
+                        <span class="workflow-arrow">-&gt;</span>
+                        <div class="workflow-node">
+                            <div class="workflow-box data">{{ t('settings.workflow.yoloe') }}</div>
+                            <span class="port">:8083 {{ t('settings.workflow.detection') }}</span>
+                        </div>
+                        <span class="workflow-arrow">-&gt;</span>
+                        <div class="workflow-node">
+                            <div class="workflow-box ai">{{ t('settings.workflow.lfm_vision') }}</div>
+                            <span class="port">:8081 {{ t('settings.workflow.scene_analysis') }}</span>
+                        </div>
+                        <span class="workflow-arrow">-&gt;</span>
+                        <div class="workflow-node">
+                            <div class="workflow-box output">{{ t('settings.workflow.grasp_position') }}</div>
+                            <span class="port">{{ t('settings.workflow.coordinates') }}</span>
+                        </div>
+                    </div>
+
+                    <div class="workflow-vertical-arrow">|</div>
+
+                    <div class="workflow-title">{{ t('settings.workflow.response_flow') }}</div>
+                    <div class="workflow-flow">
+                        <div class="workflow-node">
+                            <div class="workflow-box ai">{{ t('settings.workflow.lfm_thinking') }}</div>
+                            <span class="port">:8080 Generate</span>
+                        </div>
+                        <span class="workflow-arrow">-&gt;</span>
+                        <div class="workflow-node">
+                            <div class="workflow-box process">{{ t('settings.workflow.piper') }}</div>
+                            <span class="port">:8085 TTS</span>
+                        </div>
+                        <span class="workflow-arrow">-&gt;</span>
+                        <div class="workflow-node">
+                            <div class="workflow-box output">{{ t('settings.workflow.speaker') }}</div>
+                            <span class="port">{{ t('settings.workflow.audio_out') }}</span>
+                        </div>
+                    </div>
+
+                    <div class="flow-labels">
+                        <div class="flow-label">
+                            <span class="flow-label-badge stt">STT</span>
+                            <span>{{ t('settings.workflow.stt_label') }}</span>
+                        </div>
+                        <div class="flow-label">
+                            <span class="flow-label-badge tts">TTS</span>
+                            <span>{{ t('settings.workflow.tts_label') }}</span>
+                        </div>
+                        <div class="flow-label">
+                            <span class="flow-label-badge vision">DET</span>
+                            <span>{{ t('settings.workflow.det_label') }}</span>
+                        </div>
+                        <div class="flow-label">
+                            <span class="flow-label-badge chat">RAG</span>
+                            <span>{{ t('settings.workflow.rag_label') }}</span>
+                        </div>
+                    </div>
+
+                    <div class="workflow-title" style="margin-top: 24px;">{{ t('settings.workflow.server_ports') }}</div>
+                    <div class="port-list">
+                        <div class="port-item">
+                            <div class="port-number">8080</div>
+                            <div class="port-info">
+                                <h5>LFM2.5 Thinking</h5>
+                                <p>{{ t('settings.workflow.chat_rag') }}</p>
+                            </div>
+                        </div>
+                        <div class="port-item">
+                            <div class="port-number">8081</div>
+                            <div class="port-info">
+                                <h5>LFM2.5 Vision</h5>
+                                <p>{{ t('settings.workflow.scene_analysis') }}</p>
+                            </div>
+                        </div>
+                        <div class="port-item">
+                            <div class="port-number">8084</div>
+                            <div class="port-info">
+                                <h5>Whisper.cpp</h5>
+                                <p>{{ t('settings.workflow.stt_label') }}</p>
+                            </div>
+                        </div>
+                        <div class="port-item">
+                            <div class="port-number">8085</div>
+                            <div class="port-info">
+                                <h5>Piper TTS</h5>
+                                <p>{{ t('settings.workflow.tts_label') }}</p>
+                            </div>
+                        </div>
+                        <div class="port-item" style="border-color: var(--green);">
+                            <div class="port-number" style="background: rgba(16, 185, 129, 0.2); color: var(--green);">FLASK</div>
+                            <div class="port-info">
+                                <h5>{{ t('settings.workflow.flask_web') }}</h5>
+                                <p>{{ t('settings.workflow.port_5000') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Voice Settings Section -->
+            <div class="settings-section voice-section">
+                <div class="settings-section-title">{{ t('settings.voice_title') }}</div>
+                
+                <div class="voice-grid" id="voice-grid">
+                    <div class="voice-card selected" data-voice="en_US-lessac-medium" onclick="selectVoice(this)">
+                        <h5>{{ t('settings.voices.en_US-lessac-medium.name') }}</h5>
+                        <p>{{ t('settings.voices.en_US-lessac-medium.desc') }}</p>
+                        <span class="voice-lang">{{ t('settings.voices.en_US-lessac-medium.lang') }}</span>
+                    </div>
+                    <div class="voice-card" data-voice="en_US-lessac-low" onclick="selectVoice(this)">
+                        <h5>{{ t('settings.voices.en_US-lessac-low.name') }}</h5>
+                        <p>{{ t('settings.voices.en_US-lessac-low.desc') }}</p>
+                        <span class="voice-lang">{{ t('settings.voices.en_US-lessac-low.lang') }}</span>
+                    </div>
+                    <div class="voice-card" data-voice="en_GB-alan-medium" onclick="selectVoice(this)">
+                        <h5>{{ t('settings.voices.en_GB-alan-medium.name') }}</h5>
+                        <p>{{ t('settings.voices.en_GB-alan-medium.desc') }}</p>
+                        <span class="voice-lang">{{ t('settings.voices.en_GB-alan-medium.lang') }}</span>
+                    </div>
+                    <div class="voice-card" data-voice="fr_FR-siwis-medium" onclick="selectVoice(this)">
+                        <h5>{{ t('settings.voices.fr_FR-siwis-medium.name') }}</h5>
+                        <p>{{ t('settings.voices.fr_FR-siwis-medium.desc') }}</p>
+                        <span class="voice-lang">{{ t('settings.voices.fr_FR-siwis-medium.lang') }}</span>
+                    </div>
+                    <div class="voice-card" data-voice="de_DE-karlsson-medium" onclick="selectVoice(this)">
+                        <h5>{{ t('settings.voices.de_DE-karlsson-medium.name') }}</h5>
+                        <p>{{ t('settings.voices.de_DE-karlsson-medium.desc') }}</p>
+                        <span class="voice-lang">{{ t('settings.voices.de_DE-karlsson-medium.lang') }}</span>
+                    </div>
+                    <div class="voice-card" data-voice="es_ES-sharvard-medium" onclick="selectVoice(this)">
+                        <h5>{{ t('settings.voices.es_ES-sharvard-medium.name') }}</h5>
+                        <p>{{ t('settings.voices.es_ES-sharvard-medium.desc') }}</p>
+                        <span class="voice-lang">{{ t('settings.voices.es_ES-sharvard-medium.lang') }}</span>
+                    </div>
+                    <div class="voice-card" data-voice="it_IT-palia-medium" onclick="selectVoice(this)">
+                        <h5>{{ t('settings.voices.it_IT-palia-medium.name') }}</h5>
+                        <p>{{ t('settings.voices.it_IT-palia-medium.desc') }}</p>
+                        <span class="voice-lang">{{ t('settings.voices.it_IT-palia-medium.lang') }}</span>
+                    </div>
+                </div>
+
+                <div class="voice-download-progress" id="voice-download-progress">
+                    <div class="voice-download-progress-bar" id="voice-download-bar"></div>
+                </div>
+
+                <div class="voice-preview">
+                    <div class="voice-preview-label">{{ t('settings.voice_preview') }}</div>
+                    <button class="voice-preview-btn" id="preview-btn" onclick="previewVoice()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                            <path d="M15.54 8.46a5 5 0 010 7.07"/>
+                        </svg>
+                        {{ t('settings.voice_test') }}
+                    </button>
+                </div>
+
+                <div class="voice-tuning">
+                    <div class="voice-tuning-title">{{ t('settings.voice_tuning') }}</div>
+                    <div class="tuning-row">
+                        <span class="tuning-label">{{ t('settings.speed') }}</span>
+                        <input type="range" class="tuning-slider" id="speed-slider" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updateTuning('speed', this.value)">
+                        <span class="tuning-value" id="speed-value">1.0x</span>
+                    </div>
+                    <div class="tuning-row">
+                        <span class="tuning-label">{{ t('settings.pitch') }}</span>
+                        <input type="range" class="tuning-slider" id="pitch-slider" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updateTuning('pitch', this.value)">
+                        <span class="tuning-value" id="pitch-value">1.0x</span>
+                    </div>
+                    <div class="tuning-row">
+                        <span class="tuning-label">{{ t('settings.volume') }}</span>
+                        <input type="range" class="tuning-slider" id="volume-slider" min="0.0" max="1.0" step="0.1" value="1.0" oninput="updateTuning('volume', this.value)">
+                        <span class="tuning-value" id="volume-value">100%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/animations.js') }}"></script>
+    <script>
+        async function updateAISettings() {
+            try {
+                const resp = await fetch('/api/ai/status');
+                const data = await resp.json();
+                
+                const status = document.getElementById('ai-models-status');
+                if (status) {
+                    let html = '<div style="display:flex;gap:8px;flex-wrap:wrap;">';
+                    if (data.ai && data.ai.connected) {
+                        html += '<span class="badge b-green">{{ t('settings.ai_status.ai_on') }}</span>';
+                    } else {
+                        html += '<span class="badge b-red">{{ t('settings.ai_status.ai_off') }}</span>';
+                    }
+                    if (data.vision && data.vision.connected) {
+                        html += '<span class="badge b-green">{{ t('settings.ai_status.vision_on') }}</span>';
+                    } else {
+                        html += '<span class="badge b-red">{{ t('settings.ai_status.vision_off') }}</span>';
+                    }
+                    if (data.stt && data.stt.connected) {
+                        html += '<span class="badge b-green">{{ t('settings.ai_status.stt_on') }}</span>';
+                    } else {
+                        html += '<span class="badge b-red">{{ t('settings.ai_status.stt_off') }}</span>';
+                    }
+                    if (data.tts && data.tts.connected) {
+                        html += '<span class="badge b-green">{{ t('settings.ai_status.tts_on') }}</span>';
+                    } else {
+                        html += '<span class="badge b-red">{{ t('settings.ai_status.tts_off') }}</span>';
+                    }
+                    if (data.yoloe && data.yoloe.available) {
+                        html += '<span class="badge b-green">{{ t('settings.ai_status.yoloe') }}</span>';
+                    }
+                    html += '</div>';
+                    status.innerHTML = html;
+                }
+            } catch (e) {
+                console.log('AI status unavailable');
+            }
+        }
+        
+        updateAISettings();
+        setInterval(updateAISettings, 10000);
+        function setLang(lang) {
+            document.cookie = `lang=${lang};path=/;max-age=${60*60*24*365}`;
+            window.location.reload();
+        }
+
+        function setTheme(theme) {
+            document.querySelectorAll('.theme-option[data-color]').forEach(el => el.classList.remove('active'));
+            document.querySelector(`.theme-option[data-color="${theme}"]`).classList.add('active');
+            document.cookie = `theme=${theme};path=/;max-age=${60*60*24*365}`;
+            // Theme change would be applied here
+        }
+
+        function setAccent(color) {
+            document.querySelectorAll('.theme-option[data-accent]').forEach(el => el.classList.remove('active'));
+            document.querySelector(`.theme-option[data-accent="${color}"]`).classList.add('active');
+            document.cookie = `accent=${color};path=/;max-age=${60*60*24*365}`;
+            document.documentElement.style.setProperty('--blue', getComputedStyle(document.documentElement).getPropertyValue('--' + color) || '#3b82f6');
+        }
+
+        function showModal() {
+            document.getElementById('modal-overlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(e) {
+            if (e && e.target !== e.currentTarget) return;
+            document.getElementById('modal-overlay').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        function t(key) {
+            const trans = window.__TRANSLATIONS__[window.__CURRENT_LANG__] || {};
+            const keys = key.split('.');
+            let val = trans;
+            for (const k of keys) {
+                if (val && typeof val === 'object') val = val[k];
+                else return key;
+            }
+            return typeof val === 'string' ? val : key;
+        }
+
+        // Voice Settings
+        let currentVoice = 'en_US-lessac-medium';
+        let voiceSettings = {
+            speed: 1.0,
+            pitch: 1.0,
+            volume: 1.0
+        };
+
+        function selectVoice(card) {
+            document.querySelectorAll('.voice-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            currentVoice = card.dataset.voice;
+            document.cookie = `voice=${currentVoice};path=/;max-age=${60*60*24*365}`;
+            
+            // Show download button if voice not downloaded
+            const voiceGrid = document.getElementById('voice-grid');
+            // Voice selection saved
+        }
+
+        async function previewVoice() {
+            const btn = document.getElementById('preview-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span>{{ t('settings.voice_generating') }}</span>';
+
+            try {
+                const resp = await fetch('/api/audio/speak', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: 'Hello from PARC ROBOTICS. This is a test of the text to speech system.',
+                        voice: currentVoice
+                    })
+                });
+
+                if (resp.ok) {
+                    const blob = await resp.blob();
+                    const url = URL.createObjectURL(blob);
+                    const audio = new Audio(url);
+                    audio.play();
+                    audio.onended = () => {
+                        btn.disabled = false;
+                        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg> Test Voice';
+                    };
+                } else {
+                    btn.disabled = false;
+                    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg> Test Voice';
+                    PARC?.Toast?.show(t('settings.errors.tts_unavailable'), 'error');
+                }
+            } catch (e) {
+                btn.disabled = false;
+                btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg> Test Voice';
+                PARC?.Toast?.show(t('settings.errors.failed_to_preview_voice'), 'error');
+            }
+        }
+
+        async function downloadVoice(voiceId) {
+            const progress = document.getElementById('voice-download-progress');
+            const bar = document.getElementById('voice-download-bar');
+            progress.classList.add('active');
+            bar.style.width = '0%';
+
+            try {
+                const resp = await fetch('/api/voice/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ voice: voiceId })
+                });
+
+                // Simulate progress for demo
+                for (let i = 0; i <= 100; i += 10) {
+                    await new Promise(r => setTimeout(r, 200));
+                    bar.style.width = i + '%';
+                }
+
+                progress.classList.remove('active');
+                PARC?.Toast?.show(t('settings.voice_downloaded_successfully'), 'success');
+            } catch (e) {
+                progress.classList.remove('active');
+                PARC?.Toast?.show(t('settings.errors.failed_to_download_voice'), 'error');
+            }
+        }
+
+        function updateTuning(param, value) {
+            voiceSettings[param] = parseFloat(value);
+            
+            if (param === 'speed') {
+                document.getElementById('speed-value').textContent = value + 'x';
+            } else if (param === 'pitch') {
+                document.getElementById('pitch-value').textContent = value + 'x';
+            } else if (param === 'volume') {
+                document.getElementById('volume-value').textContent = Math.round(value * 100) + '%';
+            }
+
+            document.cookie = `voice_${param}=${value};path=/;max-age=${60*60*24*365}`;
+        }
+
+        // Load saved voice settings
+        function loadVoiceSettings() {
+            const cookies = document.cookie.split(';');
+            cookies.forEach(cookie => {
+                const [name, val] = cookie.trim().split('=');
+                if (name === 'voice') {
+                    currentVoice = val;
+                    document.querySelectorAll('.voice-card').forEach(c => {
+                        c.classList.toggle('selected', c.dataset.voice === val);
+                    });
+                } else if (name.startsWith('voice_')) {
+                    const param = name.replace('voice_', '');
+                    if (voiceSettings.hasOwnProperty(param)) {
+                        voiceSettings[param] = parseFloat(val);
+                        const slider = document.getElementById(param + '-slider');
+                        if (slider) {
+                            slider.value = val;
+                            updateTuning(param, val);
+                        }
+                    }
+                }
+            });
+        }
+
+loadVoiceSettings();
+
+        // Calibration Functions
+        let calibrationActive = false;
+
+        async function checkCalibrationStatus() {
+            try {
+                const resp = await fetch('/api/status');
+                const data = await resp.json();
+
+                const connStatus = document.getElementById('cal-conn-status');
+                const calBadge = document.getElementById('cal-badge');
+                const calControls = document.getElementById('cal-controls');
+
+                if (data.connected) {
+                    connStatus.textContent = '{{ t('status.connected') }}';
+                    calControls.style.display = 'block';
+                } else {
+                    connStatus.textContent = '{{ t('status.not_connected') }}';
+                    calControls.style.display = 'none';
+                }
+
+                if (data.calibrated) {
+                    calBadge.textContent = '{{ t('calibration.calibrated') }}';
+                    calBadge.className = 'badge b-green';
+                } else {
+                    calBadge.textContent = '{{ t('calibration.not_calibrated') }}';
+                    calBadge.className = 'badge b-red';
+                }
+            } catch (e) {
+                console.error('Failed to check calibration status:', e);
+            }
+        }
+
+        async function startCalibration() {
+            const btn = document.getElementById('btn-calibrate');
+            const stopBtn = document.getElementById('btn-stop-cal');
+            const log = document.getElementById('cal-log');
+
+            btn.disabled = true;
+            stopBtn.style.display = 'inline-block';
+            calibrationActive = true;
+
+            log.innerHTML = '<div style="color:var(--yellow);">[STARTING] Calibration started...</div>';
+
+            try {
+                const resp = await fetch('/api/calibrate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+
+                if (resp.ok) {
+                    const data = await resp.json();
+                    log.innerHTML += '<div style="color:var(--green);">[OK] Calibration started</div>';
+                    PARC?.Toast?.show('Calibration started', 'info');
+                } else {
+                    log.innerHTML += '<div style="color:var(--red);">[ERROR] Failed to start calibration</div>';
+                }
+            } catch (e) {
+                log.innerHTML += '<div style="color:var(--red);">[ERROR] ' + e.message + '</div>';
+            }
+
+            btn.disabled = false;
+        }
+
+        async function stopCalibration() {
+            const btn = document.getElementById('btn-calibrate');
+            const stopBtn = document.getElementById('btn-stop-cal');
+
+            stopBtn.style.display = 'none';
+            btn.disabled = false;
+            calibrationActive = false;
+
+            try {
+                await fetch('/api/calibrate/stop', { method: 'POST' });
+                document.getElementById('cal-log').innerHTML += '<div style="color:var(--yellow);">[STOPPED] Calibration stopped</div>';
+                PARC?.Toast?.show('Calibration stopped', 'info');
+            } catch (e) {
+                console.error('Stop calibration failed:', e);
+            }
+        }
+
+        async function saveCalibration() {
+            const log = document.getElementById('cal-log');
+
+            try {
+                const resp = await fetch('/api/calibrate/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+
+                if (resp.ok) {
+                    const data = await resp.json();
+                    log.innerHTML += '<div style="color:var(--green);">[SAVED] Calibration saved</div>';
+                    PARC?.Toast?.show('Calibration saved', 'success');
+                    checkCalibrationStatus();
+                } else {
+                    const data = await resp.json();
+                    log.innerHTML += '<div style="color:var(--red);">[ERROR] ' + (data.msg || 'Save failed') + '</div>';
+                    PARC?.Toast?.show(data.msg || 'Save failed', 'error');
+                }
+            } catch (e) {
+                log.innerHTML += '<div style="color:var(--red);">[ERROR] ' + e.message + '</div>';
+            }
+        }
+
+        async function loadCalibration() {
+            const log = document.getElementById('cal-log');
+
+            try {
+                const resp = await fetch('/api/calibrate/load', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+
+                if (resp.ok) {
+                    const data = await resp.json();
+                    log.innerHTML += '<div style="color:var(--green);">[LOADED] Calibration loaded</div>';
+                    PARC?.Toast?.show('Calibration loaded', 'success');
+                    updateServoLimitsTable(data.limits_deg || {});
+                    checkCalibrationStatus();
+                } else {
+                    const data = await resp.json();
+                    log.innerHTML += '<div style="color:var(--red);">[ERROR] ' + (data.msg || 'Load failed') + '</div>';
+                    PARC?.Toast?.show(data.msg || 'Load failed', 'error');
+                }
+            } catch (e) {
+                log.innerHTML += '<div style="color:var(--red);">[ERROR] ' + e.message + '</div>';
+            }
+        }
+
+        async function resetToCenter() {
+            const log = document.getElementById('cal-log');
+
+            try {
+                const resp = await fetch('/api/calibrate/reset', { method: 'POST' });
+
+                if (resp.ok) {
+                    const data = await resp.json();
+                    log.innerHTML += '<div style="color:var(--blue);">[RESET] ' + data.msg + '</div>';
+                    PARC?.Toast?.show('Servos reset to center', 'success');
+                } else {
+                    log.innerHTML += '<div style="color:var(--red);">[ERROR] Reset failed</div>';
+                }
+            } catch (e) {
+                log.innerHTML += '<div style="color:var(--red);">[ERROR] ' + e.message + '</div>';
+            }
+        }
+
+        function updateServoLimitsTable(limits) {
+            const tbody = document.getElementById('servo-limits-body');
+            if (!tbody) return;
+
+            const servoNames = ['shoulder_pan', 'shoulder_lift', 'elbow_flex', 'wrist_flex', 'wrist_roll', 'gripper'];
+            const displayNames = ['Pan', 'Lift', 'Elbow', 'Wrist Flex', 'Wrist Roll', 'Gripper'];
+
+            tbody.innerHTML = servoNames.map((name, i) => {
+                const lim = limits[name] || { min: -90, ctr: 0, max: 90 };
+                return '<tr style="border-bottom:1px solid var(--border);">' +
+                    '<td style="padding:8px;font-weight:600;">' + displayNames[i] + '</td>' +
+                    '<td style="text-align:center;padding:8px;"><input type="number" id="lim-min-' + name + '" value="' + lim.min + '" style="width:60px;background:var(--bg4);border:1px solid var(--border);border-radius:4px;color:var(--text);text-align:center;font-family:var(--mono);font-size:11px;"></td>' +
+                    '<td style="text-align:center;padding:8px;"><input type="number" id="lim-ctr-' + name + '" value="' + lim.ctr + '" style="width:60px;background:var(--bg4);border:1px solid var(--border);border-radius:4px;color:var(--blue);text-align:center;font-family:var(--mono);font-size:11px;font-weight:700;"></td>' +
+                    '<td style="text-align:center;padding:8px;"><input type="number" id="lim-max-' + name + '" value="' + lim.max + '" style="width:60px;background:var(--bg4);border:1px solid var(--border);border-radius:4px;color:var(--text);text-align:center;font-family:var(--mono);font-size:11px;"></td>' +
+                    '<td style="text-align:center;padding:8px;"><button class="btn btn-sm btn-ghost" onclick="setCenter(\'' + name + '\')">Set Center</button></td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        async function setCenter(servo) {
+            try {
+                const resp = await fetch('/api/calibrate/set_center', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ servo: servo })
+                });
+
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const ctrInput = document.getElementById('lim-ctr-' + servo);
+                    if (ctrInput && data.center_deg && data.center_deg[servo] !== undefined) {
+                        ctrInput.value = data.center_deg[servo];
+                    }
+                    PARC?.Toast?.show(servo + ' center set', 'success');
+                }
+            } catch (e) {
+                PARC?.Toast?.show('Failed to set center', 'error');
+            }
+        }
+
+        function initCalibrationLogs() {
+            const logSrc = new EventSource('/stream/logs');
+            logSrc.onmessage = (e) => {
+                const log = document.getElementById('cal-log');
+                if (log) {
+                    const entry = JSON.parse(e.data);
+                    const color = entry.includes('[ERROR]') ? 'var(--red)' :
+                                  entry.includes('[OK]') || entry.includes('[SAVED]') || entry.includes('[LOADED]') ? 'var(--green)' :
+                                  entry.includes('[STOP]') || entry.includes('[START]') ? 'var(--yellow)' : 'var(--text-dim)';
+                    log.innerHTML += '<div style="color:' + color + ';">' + entry + '</div>';
+                    log.scrollTop = log.scrollHeight;
+                }
+            };
+        }
+
+        checkCalibrationStatus();
+        updateServoLimitsTable({});
+        initCalibrationLogs();
+        setInterval(checkCalibrationStatus, 5000);
+    </script>
+{% endblock %}

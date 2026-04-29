@@ -1,0 +1,11 @@
+[0;93m2026-04-28 22:55:25.173258909 [W:onnxruntime:Default, device_discovery.cc:325 DiscoverDevicesForPlatform] GPU device discovery failed: device_discovery.cc:92 ReadFileContents Failed to open file: "/sys/class/drm/card0/device/vendor"[m
+Traceback (most recent call last):
+  File "/home/parc/miniconda3/bin/piper", line 6, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/home/parc/miniconda3/lib/python3.13/site-packages/piper/__main__.py", line 149, in main
+    voice = PiperVoice.load(model_path, use_cuda=args.cuda)
+  File "/home/parc/miniconda3/lib/python3.13/site-packages/piper/voice.py", line 144, in load
+    with open(config_path, "r", encoding="utf-8") as config_file:
+         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/parc/models/voices/en_US-lessac-medium.onnx.json'
