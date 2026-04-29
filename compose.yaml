@@ -1,0 +1,46 @@
+services:
+
+  # ── Real arm controller ────────────────────────────────────────────────────
+  controller:
+    build:
+      context: ./control_arm
+    ports:
+      - "${CONTROLLER_PORT:-5000}:5000"
+    devices:
+      - "${SERIAL_PORT:-/dev/ttyACM0}:${SERIAL_PORT:-/dev/ttyACM0}"
+    group_add:
+      - dialout
+    restart: unless-stopped
+
+  # ── MuJoCo physics server + web 3-D viewer ────────────────────────────────
+  simulation:
+    build:
+      context: ./simulation
+    ports:
+      - "${HTTP_PORT:-38000}:38000"
+      - "${WS_PORT:-38001}:38001"
+    volumes:
+      - "${SO101_DIR:-/home/parc/Desktop/InverseKinematics/so101-inverse-kinematics-main/so101}:/opt/so101:ro"
+    environment:
+      SO101_DIR: /opt/so101
+      WEB_DIR:   /app/web
+      BIND_HOST: "0.0.0.0"
+      HTTP_PORT: 38000
+      WS_PORT:   38001
+    # restart: unless-stopped
+
+  # ── Simulation → real arm bridge (enable with COMPOSE_PROFILES=sync) ──────
+  bridge:
+    build:
+      context: ./simulation
+    command: python bridge.py
+    environment:
+      SIM_WS:         "ws://simulation:38001"
+      CONTROLLER_URL: "http://controller:5000"
+      RATE_HZ:        "${RATE_HZ:-20}"
+    depends_on:
+      - simulation
+      # - controller
+    profiles:
+      - sync
+    restart: on-failure

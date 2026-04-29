@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SO101 Robot Control</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background: #0a0a0f; 
+            color: #fff; 
+            overflow: hidden; 
+        }
+        #canvas { width: 100vw; height: 100vh; display: block; }
+        #status {
+            position: fixed; bottom: 20px; left: 20px;
+            padding: 12px 16px;
+            background: rgba(0,0,0,0.75);
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: 'Consolas', monospace;
+            color: #0f0;
+        }
+        #connection {
+            position: fixed; top: 20px; right: 20px;
+            padding: 8px 14px;
+            background: rgba(0,0,0,0.75);
+            border-radius: 8px;
+            font-size: 12px;
+        }
+        .connected { color: #0f0; }
+        .disconnected { color: #f44; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="status">Connecting...</div>
+    <div id="connection" class="disconnected">Disconnected</div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+            "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import GUI from 'lil-gui';
+
+        // ================== CONFIGURATION ==================
+        const WS_URL = 'ws://localhost:38001';
+        const HTTP_URL = 'http://localhost:38000';
+        const AUTO_REFRESH = 50;  // ms for HTTP polling
+        
+        // Joint limits for sliders
+        const JOINT_LIMITS = [
+            [-2.2, 2.2],   // Rotation
+            [-3.14, 0.2],  // Pitch
+            [0, 3.14],     // Elbow
+            [-2.0, 1.8],  // Wrist_Pitch
+            [-3.14, 3.14], // Wrist_Roll
+            [-0.2, 2.0]    // Jaw
+        ];
+
+        // ================== GLOBALS ==================
+        let ws = null;
+        let scene, camera, renderer, controls;
+        let gui, designFolder, controlFolder;
+        let robotMeshes = {};
+        let targetPoses = {};
+        let bodyNames = [];
+        let jointNames = [];
+        let currentTargets = {};
+        
+        // Design settings
+        const designSettings = {
+            color: '#e54b00',
+            metalness: 0.3,
+            roughness: 0.4,
+            wireframe: false
+        };
+
+        // Start
+        init();
+        startHttpPolling(); // Start HTTP polling immediately
+        setTimeout(connectWebSocket, 2000); // Try WebSocket after 2s
+        setTimeout(autoLoadGLB, 1500);
+
+        function init() {
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a2e);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.001, 100);
+            camera.position.set(0.5, 0.4, 0.5);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ 
+                canvas: document.getElementById('canvas'), 
+                antialias: true,
+                powerPreference: "high-performance"
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            // OrbitControls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.target.set(0, 0.1, 0);
+
+            // Lighting
+            const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambient);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            dirLight.position.set(2, 3, 2);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            scene.add(dirLight);
+
+            const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+            fillLight.position.set(-2, 1, -1);
+            scene.add(fillLight);
+
+            // Grid
+            const grid = new THREE.GridHelper(1, 20, 0x333333, 0x222222);
+            scene.add(grid);
+
+            // Axes helper
+            const axes = new THREE.AxesHelper(0.15);
+            scene.add(axes);
+
+            // GUI
+            setupGUI();
+
+            // Window resize
+            window.addEventListener('resize', onResize);
+
+            // Connect WebSocket
+            connectWebSocket();
+
+            // Start render loop
+            animate();
+        }
+
+        function setupGUI() {
+            gui = new GUI({ title: 'SO101 Control Panel' });
+            gui.domElement.style.marginTop = '10px';
+
+            // Design tab
+            designFolder = gui.addFolder('Design');
+            designFolder.addColor(designSettings, 'color').name('Color').onChange(updateMaterials);
+            designFolder.add(designSettings, 'metalness', 0, 1).name('Metalness').onChange(updateMaterials);
+            designFolder.add(designSettings, 'roughness', 0, 1).name('Roughness').onChange(updateMaterials);
+            designFolder.add(designSettings, 'wireframe').name('Wireframe').onChange(updateMaterials);
+            designFolder.close();
+
+            // Control tab
+            controlFolder = gui.addFolder('Control');
+            controlFolder.close();
+
+            // Load GLB button
+            gui.add({ loadGLB: () => promptGLB() }, 'loadGLB').name('Load GLB Model');
+        }
+
+        function updateControlGUI() {
+            // Clear existing controllers
+            controlFolder.showDom.innerHTML = '';
+            
+            jointNames.slice(0, 6).forEach((name, i) => {
+                const displayName = name; // Use full joint name
+                const [min, max] = JOINT_LIMITS[i] || [-3.14, 3.14];
+                const initial = currentTargets[name] || 0;
+                
+                controlFolder.add(
+                    currentTargets,
+                    name,
+                    min, max
+                ).name(displayName).onChange(value => {
+                    sendControl();
+                });
+            });
+
+            // Home position button
+            controlFolder.add({ home: goHome }, 'home').name('Go Home');
+        }
+
+        function goHome() {
+            const homeTargets = [0, -1.57, 1.57, 0, 0, 0];
+            jointNames.slice(0, 6).forEach((name, i) => {
+                currentTargets[name] = homeTargets[i];
+            });
+            updateControlGUI();
+            sendControl();
+        }
+
+        function updateMaterials() {
+            Object.values(robotMeshes).forEach(mesh => {
+                if (mesh.material) {
+                    mesh.material.color.set(designSettings.color);
+                    mesh.material.metalness = designSettings.metalness;
+                    mesh.material.roughness = designSettings.roughness;
+                    mesh.material.wireframe = designSettings.wireframe;
+                }
+            });
+        }
+
+        // ================== WEBSOCKET ==================
+        function connectWebSocket() {
+            ws = new WebSocket(WS_URL);
+            
+            ws.onopen = () => {
+                document.getElementById('connection').textContent = 'Connected';
+                document.getElementById('connection').className = 'connected';
+                document.getElementById('status').textContent = 'Connected';
+            };
+            
+            ws.onclose = () => {
+                document.getElementById('connection').textContent = 'Disconnected';
+                document.getElementById('connection').className = 'disconnected';
+                document.getElementById('status').textContent = 'Using HTTP polling';
+                setTimeout(connectWebSocket, 1000);
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'init') {
+                        bodyNames = data.body_names || [];
+                        jointNames = data.joint_names || [];
+                        createMeshes();
+                        updateControlGUI();
+                        autoLoadGLB(); // Auto-load GLB
+                    }
+                    else if (data.type === 'state') {
+                        updateRobotPose(data);
+                        document.getElementById('status').textContent = 
+                            `Time: ${data.time?.toFixed(2)}s | Bodies: ${Object.keys(data.positions || {}).length}`;
+                    }
+                } catch (e) {
+                    console.error('Parse error:', e);
+                }
+            };
+            
+            ws.onerror = (e) => {
+                console.log('WebSocket error, using HTTP fallback');
+            };
+        }
+
+        // ================== HTTP POLLING FALLBACK ==================
+        let httpPollInterval = null;
+
+        function startHttpPolling() {
+            if (httpPollInterval) return;
+            httpPollInterval = setInterval(async () => {
+                try {
+                    const res = await fetch(HTTP_URL + '/api/state');
+                    const data = await res.json();
+                    if (data.body_names && !bodyNames.length) {
+                        bodyNames = data.body_names;
+                        jointNames = data.joint_names || [];
+                        createMeshes();
+                        updateControlGUI();
+                        autoLoadGLB();
+                    }
+                    updateRobotPose(data);
+                    document.getElementById('status').textContent = 
+                        `HTTP | Time: ${data.time?.toFixed(2)}s`;
+                } catch (e) {
+                    // Ignore HTTP errors
+                }
+            }, AUTO_REFRESH);
+        }
+        }
+
+        function sendControl() {
+            if (ws?.readyState !== WebSocket.OPEN) return;
+            
+            ws.send(JSON.stringify({
+                type: 'control',
+                targets: { ...currentTargets }
+            }));
+        }
+
+        // ================== ROBOT MESHES ==================
+        function createMeshes() {
+            // Clear existing
+            Object.values(robotMeshes).forEach(m => scene.remove(m));
+            robotMeshes = {};
+            targetPoses = {};
+
+            bodyNames.forEach(name => {
+                // Create placeholder box - size varies by body
+                const size = getBodySize(name);
+                const geometry = new THREE.BoxGeometry(size, size, size);
+                const material = new THREE.MeshStandardMaterial({
+                    color: designSettings.color,
+                    metalness: designSettings.metalness,
+                    roughness: designSettings.roughness,
+                });
+                
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.name = name;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                
+                // CRITICAL: Add directly to scene, NOT as child
+                scene.add(mesh);
+                robotMeshes[name] = mesh;
+                
+                // Initialize target pose
+                targetPoses[name] = {
+                    position: new THREE.Vector3(),
+                    quaternion: new THREE.Quaternion()
+                };
+            });
+        }
+
+        function getBodySize(name) {
+            // Approximate sizes based on body type
+            if (name.includes('Base')) return 0.08;
+            if (name.includes('Pitch') || name.includes('Upper') || name.includes('Lower')) return 0.05;
+            if (name.includes('Jaw')) return 0.025;
+            if (name.includes('Wrist')) return 0.03;
+            return 0.04;
+        }
+
+        // ================== COORDINATE CONVERSION ==================
+        /*
+         * MuJoCo to Three.js conversion:
+         * - MuJoCo is Z-up, Three.js is Y-up
+         * - Swap Y and Z coordinates: (x, y, z) -> (x, z, -y)
+         * - Quaternions: MuJoCo [w,x,y,z] -> Three.js [x,y,z,w]
+         */
+        function mujocoToThree(pos, quat) {
+            // Position: swap Y and Z, negate new Z
+            const threePos = new THREE.Vector3(
+                pos[0],
+                pos[2],
+                -pos[1]
+            );
+            
+            // Quaternion: reorder from [w,x,y,z] to [x,y,z,w]
+            const threeQuat = new THREE.Quaternion(
+                quat[0],  // x
+                quat[2],  // y (was z)
+                -quat[1], // z (was y, negated)
+                quat[3]   // w
+            );
+            
+            return { position: threePos, quaternion: threeQuat };
+        }
+
+        // ================== POSE UPDATE ==================
+        function updateRobotPose(state) {
+            const positions = state.positions || {};
+            const quaternions = state.quaternions || {};
+            
+            Object.entries(positions).forEach(([name, pos]) => {
+                const mesh = robotMeshes[name];
+                if (!mesh) return;
+                
+                const quat = quaternions[name] || [1, 0, 0, 0];
+                const converted = mujocoToThree(pos, quat);
+                
+                // Store target pose
+                targetPoses[name].position.copy(converted.position);
+                targetPoses[name].quaternion.copy(converted.quaternion);
+                
+                // Smooth interpolation (lerp/slerp)
+                mesh.position.lerp(converted.position, SMOOTHING);
+                mesh.quaternion.slerp(converted.quaternion, SMOOTHING);
+            });
+        }
+
+        // ================== RENDER LOOP ==================
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // ================== LOAD GLB ==================
+        window.loadRealModel = function(url) {
+            const loader = new GLTFLoader();
+            
+            document.getElementById('status').textContent = 'Loading GLB...';
+            
+            loader.load(url, (gltf) => {
+                // Remove placeholder meshes
+                Object.values(robotMeshes).forEach(m => scene.remove(m));
+                robotMeshes = {};
+                
+                // Process loaded model
+                gltf.scene.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        
+                        // Update material
+                        child.material = new THREE.MeshStandardMaterial({
+                            color: designSettings.color,
+                            metalness: designSettings.metalness,
+                            roughness: designSettings.roughness,
+                        });
+                        
+                        // Try to match by name
+                        const childName = child.name.toLowerCase();
+                        bodyNames.forEach(bn => {
+                            if (childName.includes(bn.toLowerCase()) || 
+                                bn.toLowerCase().includes(childName)) {
+                                robotMeshes[bn] = child;
+                                child.name = bn;
+                            }
+                        });
+                    }
+                });
+                
+                scene.add(gltf.scene);
+                document.getElementById('status').textContent = `Loaded: ${url}`;
+            }, undefined, (e) => {
+                document.getElementById('status').textContent = `Load error: ${e}`;
+            });
+        };
+
+        function promptGLB() {
+            const url = prompt('Enter GLB model URL:', '/model.glb');
+            if (url) loadRealModel(url);
+        }
+        
+        // Auto-load GLB from server
+        async function autoLoadGLB() {
+            try {
+                const res = await fetch('/model.glb');
+                if (res.ok) {
+                    loadRealModel('/model.glb');
+                }
+            } catch (e) {
+                console.log('No GLB available');
+            }
+        }
+    </script>
+</body>
+</html>

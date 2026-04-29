@@ -1,0 +1,7 @@
+__pycache__/
+proposal/
+temp/
+*cache/
+*.egg-info/
+*.so
+temp*

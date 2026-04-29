@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:d[k] for k in ['cards','actions','gallery']}, indent=2\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:d[k] for k in ['cards','actions']}, indent=2\\)\\)\")",
+      "Bash(/home/parc/simulation/control_arm/.venv/bin/python -c \"import mujoco; print\\('mujoco ok'\\)\")",
+      "Bash(python3 -c \"import mujoco; print\\('mujoco ok'\\)\")",
+      "Bash(python3 -c \"import sys; print\\(sys.executable\\)\")",
+      "Bash(curl -s http://localhost:5000/)",
+      "Bash(.venv/bin/python -c \"from app import app; print\\('imports ok'\\)\")",
+      "Bash(.venv/bin/python -c \"from app import app; print\\('ok'\\)\")",
+      "Bash(nohup .venv/bin/python app.py)"
+    ]
+  }
+}
