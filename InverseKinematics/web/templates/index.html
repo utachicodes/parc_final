@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SO101 Robotic Arm Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a2e; color: #eee; overflow: hidden; }
+        #container { display: flex; height: 100vh; }
+        #viewer { flex: 2; position: relative; }
+        #controls { flex: 1; background: #16213e; padding: 20px; overflow-y: auto; max-width: 420px; }
+        #canvas { width: 100%; height: 100%; display: block; }
+        .panel { background: #0f3460; border-radius: 10px; padding: 15px; margin-bottom: 15px; }
+        .panel h3 { color: #e94560; margin-bottom: 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+        .joint-control { margin: 8px 0; }
+        .joint-control label { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 12px; }
+        .joint-control input[type="range"] { width: 100%; height: 6px; border-radius: 3px; background: #1a1a2e; outline: none; }
+        .joint-control input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #e94560; cursor: pointer; }
+        .joint-value { font-family: monospace; color: #00d9ff; min-width: 55px; text-align: right; font-size: 11px; }
+        .btn { background: #e94560; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 12px; margin: 3px 2px; transition: background 0.3s; }
+        .btn:hover { background: #ff6b6b; }
+        .btn:disabled { background: #555; cursor: not-allowed; }
+        .btn.active { background: #00c853; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+        .info-item { background: #1a1a2e; padding: 6px; border-radius: 4px; }
+        .info-item .label { font-size: 10px; color: #888; text-transform: uppercase; }
+        .info-item .value { font-size: 13px; font-family: monospace; color: #00d9ff; margin-top: 2px; }
+        .matrix-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; font-family: monospace; font-size: 9px; }
+        .matrix-cell { background: #1a1a2e; padding: 3px; text-align: center; border-radius: 2px; }
+        .status { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; }
+        .status.success { background: #00c853; }
+        .status.failure { background: #d50000; }
+        .target-input { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+        .target-input input { background: #1a1a2e; border: 1px solid #333; color: #00d9ff; padding: 6px; border-radius: 4px; text-align: center; font-family: monospace; font-size: 12px; }
+        .target-input input:focus { outline: none; border-color: #e94560; }
+        select { width: 100%; padding: 8px; background: #1a1a2e; border: 1px solid #333; color: #eee; border-radius: 5px; margin-top: 8px; font-size: 12px; }
+        .loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #e94560; font-size: 18px; }
+        #loading-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(26,26,46,0.9); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="viewer">
+            <canvas id="canvas"></canvas>
+            <div id="loading-overlay"><div class="loading">Loading 3D Model...</div></div>
+        </div>
+        <div id="controls">
+            <div class="panel">
+                <h3>Joint Controls</h3>
+                <div id="joint-controls"></div>
+                <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="btn" onclick="resetJoints()">Reset</button>
+                    <button class="btn" onclick="animateToHome()">Home</button>
+                    <button class="btn" onclick="toggleAutoUpdate()">Auto FK: ON</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>End Effector Target (X, Y, Z)</h3>
+                <div class="target-input">
+                    <input type="number" id="target-x" placeholder="X" step="0.01" value="0.0">
+                    <input type="number" id="target-y" placeholder="Y" step="0.01" value="0.15">
+                    <input type="number" id="target-z" placeholder="Z" step="0.01" value="0.3">
+                </div>
+                <select id="ik-method">
+                    <option value="chan">Chan Method (LM)</option>
+                    <option value="sugihara">Sugihara Method (LM)</option>
+                    <option value="wampler">Wampler Method (LM)</option>
+                </select>
+                <button class="btn" onclick="solveIK()" style="width: 100%; margin-top: 8px;">Solve IK</button>
+            </div>
+
+            <div class="panel">
+                <h3>Position Servo</h3>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label style="font-size: 11px;">Gain:</label>
+                    <input type="range" id="servo-gain" min="0.1" max="5" step="0.1" value="2.0" style="flex: 1;">
+                    <span id="gain-value" class="joint-value">2.0</span>
+                </div>
+                <button class="btn" id="servo-btn" onclick="toggleServo()">Start Servo</button>
+                <div id="servo-status" style="margin-top: 6px; font-size: 11px; font-family: monospace;"></div>
+            </div>
+
+            <div class="panel">
+                <h3>End Effector Pose</h3>
+                <div class="info-grid">
+                    <div class="info-item"><div class="label">X</div><div class="value" id="ee-x">0.000</div></div>
+                    <div class="info-item"><div class="label">Y</div><div class="value" id="ee-y">0.000</div></div>
+                    <div class="info-item"><div class="label">Z</div><div class="value" id="ee-z">0.000</div></div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Jacobian (6x6)</h3>
+                <div id="jacobian-display" class="matrix-grid"></div>
+            </div>
+
+            <div class="panel">
+                <h3>Manipulability Analysis</h3>
+                <div class="info-grid">
+                    <div class="info-item"><div class="label">Measure (m)</div><div class="value" id="manip-m">0.000</div></div>
+                    <div class="info-item"><div class="label">Condition #</div><div class="value" id="manip-cond">0.000</div></div>
+                    <div class="info-item"><div class="label">Singular Values</div><div class="value" id="manip-sv" style="font-size:10px;">-</div></div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>IK Result</h3>
+                <div id="ik-result" style="font-family: monospace; font-size: 11px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const JOINT_INFO = [
+            { name: 'Rotation', axis: 'y', min: -2.2, max: 2.2, color: 0xe94560 },
+            { name: 'Pitch', axis: 'x', min: -3.14, max: 0.2, color: 0xff6b6b },
+            { name: 'Elbow', axis: 'x', min: 0, max: 3.14, color: 0xffc107 },
+            { name: 'Wrist Pitch', axis: 'x', min: -2.0, max: 1.8, color: 0x00c853 },
+            { name: 'Wrist Roll', axis: 'y', min: -3.14, max: 3.14, color: 0x00d9ff },
+            { name: 'Jaw', axis: 'z', min: -0.2, max: 2.0, color: 0x7c4dff }
+        ];
+
+        let jointAngles = [0, -1.57, 1.57, 0, 0, 0];
+        let autoUpdate = true;
+
+        let scene, camera, renderer, controls;
+        let jointGroups = [];
+        let baseGroup;
+        let eeGroup;
+        let servoInterval = null;
+
+        const ASSETS_DIR = '/static/';
+
+        async function loadStl(url) {
+            return new Promise((resolve, reject) => {
+                const loader = new THREE.STLLoader();
+                loader.load(url, (geometry) => {
+                    resolve(geometry);
+                }, undefined, reject);
+            });
+        }
+
+        async function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a2e);
+
+            camera = new THREE.PerspectiveCamera(50, document.getElementById('viewer').clientWidth / document.getElementById('viewer').clientHeight, 0.001, 10);
+            camera.position.set(0.4, 0.3, 0.5);
+
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), antialias: true });
+            renderer.setSize(document.getElementById('viewer').clientWidth, document.getElementById('viewer').clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambient);
+            const directional = new THREE.DirectionalLight(0xffffff, 0.8);
+            directional.position.set(1, 1, 1);
+            scene.add(directional);
+
+            const grid = new THREE.GridHelper(0.6, 30, 0x444444, 0x222222);
+            grid.position.y = -0.1;
+            scene.add(grid);
+
+            await createRobot();
+            createJointControls();
+            updateRobot();
+            updateFK();
+
+            document.getElementById('loading-overlay').style.display = 'none';
+
+            window.addEventListener('resize', onResize);
+            animate();
+        }
+
+        async function createRobot() {
+            const orangeMat = new THREE.MeshPhongMaterial({ color: 0xff5500, specular: 0.1, shininess: 0.1 });
+            const blackMat = new THREE.MeshPhongMaterial({ color: 0x1a1a1a, specular: 0.1, shininess: 0.1 });
+
+            const stlFiles = {
+                'Base': 'Base.stl',
+                'Base_Motor': 'Base_Motor.stl',
+                'Rotation_Pitch': 'Rotation_Pitch.stl',
+                'Rotation_Pitch_Motor': 'Rotation_Pitch_Motor.stl',
+                'Upper_Arm': 'Upper_Arm.stl',
+                'Upper_Arm_Motor': 'Upper_Arm_Motor.stl',
+                'Lower_Arm': 'Lower_Arm.stl',
+                'Lower_Arm_Motor': 'Lower_Arm_Motor.stl',
+                'Wrist_Pitch_Roll': 'Wrist_Pitch_Roll.stl',
+                'Wrist_Pitch_Roll_Motor': 'Wrist_Pitch_Roll_Motor.stl',
+                'Fixed_Jaw': 'Fixed_Jaw.stl',
+                'Fixed_Jaw_Motor': 'Fixed_Jaw_Motor.stl',
+                'Moving_Jaw': 'Moving_Jaw.stl'
+            };
+
+            const meshes = {};
+            for (const [name, file] of Object.entries(stlFiles)) {
+                try {
+                    const geom = await loadStl(ASSETS_DIR + file);
+                    const isMotor = name.includes('Motor');
+                    const mat = isMotor ? blackMat : orangeMat;
+                    meshes[name] = new THREE.Mesh(geom, mat);
+                    console.log('Loaded:', name);
+                } catch (e) {
+                    console.warn('Failed to load', name, e);
+                }
+            }
+
+            baseGroup = new THREE.Group();
+            scene.add(baseGroup);
+
+            if (meshes['Base']) baseGroup.add(meshes['Base'].clone());
+            if (meshes['Base_Motor']) baseGroup.add(meshes['Base_Motor'].clone());
+
+            const joint0 = new THREE.Group();
+            joint0.position.set(0, -0.0452, 0.0165);
+            joint0.quaternion.setFromEuler(new THREE.Euler(1.5708, 0, 0));
+            jointGroups.push({ group: joint0, axis: 'y', index: 0 });
+
+            const link1Group = new THREE.Group();
+            link1Group.position.set(0, 0.1025, 0.0306);
+            link1Group.quaternion.setFromEuler(new THREE.Euler(1.5708, 0, 0));
+            if (meshes['Rotation_Pitch']) link1Group.add(meshes['Rotation_Pitch'].clone());
+            if (meshes['Rotation_Pitch_Motor']) link1Group.add(meshes['Rotation_Pitch_Motor'].clone());
+            joint0.add(link1Group);
+
+            const joint1 = new THREE.Group();
+            joint1.quaternion.setFromEuler(new THREE.Euler(-1.5708, 0, 0));
+            link1Group.add(joint1);
+            jointGroups.push({ group: joint1, axis: 'x', index: 1 });
+
+            const link2Group = new THREE.Group();
+            link2Group.position.set(0, 0.11257, 0.028);
+            if (meshes['Upper_Arm']) link2Group.add(meshes['Upper_Arm'].clone());
+            if (meshes['Upper_Arm_Motor']) link2Group.add(meshes['Upper_Arm_Motor'].clone());
+            joint1.add(link2Group);
+
+            const joint2 = new THREE.Group();
+            joint2.quaternion.setFromEuler(new THREE.Euler(-1.5708, 0, 0));
+            link2Group.add(joint2);
+            jointGroups.push({ group: joint2, axis: 'x', index: 2 });
+
+            const link3Group = new THREE.Group();
+            link3Group.position.set(0, 0.0052, 0.1349);
+            if (meshes['Lower_Arm']) link3Group.add(meshes['Lower_Arm'].clone());
+            if (meshes['Lower_Arm_Motor']) link3Group.add(meshes['Lower_Arm_Motor'].clone());
+            joint2.add(link3Group);
+
+            const joint3 = new THREE.Group();
+            joint3.quaternion.setFromEuler(new THREE.Euler(-1.5708, 0, 0));
+            link3Group.add(joint3);
+            jointGroups.push({ group: joint3, axis: 'x', index: 3 });
+
+            const link4Group = new THREE.Group();
+            if (meshes['Wrist_Pitch_Roll']) link4Group.add(meshes['Wrist_Pitch_Roll'].clone());
+            if (meshes['Wrist_Pitch_Roll_Motor']) link4Group.add(meshes['Wrist_Pitch_Roll_Motor'].clone());
+            joint3.add(link4Group);
+
+            const joint4 = new THREE.Group();
+            joint4.quaternion.setFromEuler(new THREE.Euler(0, 1.5708, 0));
+            link4Group.add(joint4);
+            jointGroups.push({ group: joint4, axis: 'y', index: 4 });
+
+            const link5Group = new THREE.Group();
+            link5Group.position.set(0, -0.0601, 0);
+            if (meshes['Fixed_Jaw']) link5Group.add(meshes['Fixed_Jaw'].clone());
+            if (meshes['Fixed_Jaw_Motor']) link5Group.add(meshes['Fixed_Jaw_Motor'].clone());
+            joint4.add(link5Group);
+
+            const joint5 = new THREE.Group();
+            joint5.quaternion.setFromEuler(new THREE.Euler(0, 3.14, 0));
+            link5Group.add(joint5);
+            jointGroups.push({ group: joint5, axis: 'z', index: 5 });
+
+            const link6Group = new THREE.Group();
+            link6Group.position.set(-0.0202, -0.0244, 0);
+            if (meshes['Moving_Jaw']) link6Group.add(meshes['Moving_Jaw'].clone());
+            joint5.add(link6Group);
+
+            eeGroup = link6Group;
+
+            baseGroup.add(joint0);
+
+            const targetGeom = new THREE.SphereGeometry(0.01, 16, 16);
+            const targetMat = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+            window.targetMarker = new THREE.Mesh(targetGeom, targetMat);
+            window.targetMarker.position.set(0, 0.15, 0.3);
+            scene.add(window.targetMarker);
+        }
+
+        function updateRobot() {
+            jointGroups.forEach((j, i) => {
+                const angle = jointAngles[i];
+                const euler = new THREE.Euler(0, 0, 0);
+                if (j.axis === 'x') euler.x = angle;
+                else if (j.axis === 'y') euler.y = angle;
+                else if (j.axis === 'z') euler.z = angle;
+                j.group.quaternion.setFromEuler(euler);
+            });
+        }
+
+        function createJointControls() {
+            const container = document.getElementById('joint-controls');
+            JOINT_INFO.forEach((info, i) => {
+                const div = document.createElement('div');
+                div.className = 'joint-control';
+                div.innerHTML = `
+                    <label>
+                        <span>${info.name}</span>
+                        <span class="joint-value" id="jv-${i}">${jointAngles[i].toFixed(3)}</span>
+                    </label>
+                    <input type="range" id="jc-${i}" min="${info.min}" max="${info.max}" step="0.01" value="${jointAngles[i]}">
+                `;
+                container.appendChild(div);
+                const slider = div.querySelector('input');
+                slider.addEventListener('input', (e) => {
+                    jointAngles[i] = parseFloat(e.target.value);
+                    document.getElementById(`jv-${i}`).textContent = jointAngles[i].toFixed(3);
+                    updateRobot();
+                    if (autoUpdate) updateFK();
+                });
+            });
+        }
+
+        async function updateFK() {
+            try {
+                const resp = await fetch('/api/fk', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ qpos: jointAngles })
+                });
+                const data = await resp.json();
+                document.getElementById('ee-x').textContent = data.position[0].toFixed(3);
+                document.getElementById('ee-y').textContent = data.position[1].toFixed(3);
+                document.getElementById('ee-z').textContent = data.position[2].toFixed(3);
+                updateJacobian();
+                updateManipulability();
+            } catch (e) {
+                console.error('FK error:', e);
+            }
+        }
+
+        async function updateJacobian() {
+            try {
+                const resp = await fetch('/api/jacobian', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ qpos: jointAngles })
+                });
+                const data = await resp.json();
+                const container = document.getElementById('jacobian-display');
+                container.innerHTML = '';
+                const J = data.jacobian;
+                for (let r = 0; r < J.length; r++) {
+                    for (let c = 0; c < J[r].length; c++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'matrix-cell';
+                        cell.textContent = Math.abs(J[r][c]) < 100 ? J[r][c].toFixed(1) : '---';
+                        container.appendChild(cell);
+                    }
+                }
+            } catch (e) {
+                console.error('Jacobian error:', e);
+            }
+        }
+
+        async function updateManipulability() {
+            try {
+                const resp = await fetch('/api/manipulability', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ qpos: jointAngles })
+                });
+                const data = await resp.json();
+                document.getElementById('manip-m').textContent = data.manipulability.toFixed(4);
+                document.getElementById('manip-cond').textContent = data.condition_number.toFixed(1);
+                document.getElementById('manip-sv').textContent = data.singular_values.slice(0, 3).map(v => v.toFixed(2)).join(', ');
+            } catch (e) {
+                console.error('Manipulability error:', e);
+            }
+        }
+
+        async function solveIK() {
+            const x = parseFloat(document.getElementById('target-x').value);
+            const y = parseFloat(document.getElementById('target-y').value);
+            const z = parseFloat(document.getElementById('target-z').value);
+            const method = document.getElementById('ik-method').value;
+            window.targetMarker.position.set(x, y, z);
+            try {
+                const resp = await fetch('/api/ik', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ q_now: jointAngles, target: [x, y, z, 0, 0, 0], method })
+                });
+                const data = await resp.json();
+                const resultDiv = document.getElementById('ik-result');
+                if (data.success) {
+                    resultDiv.innerHTML = `<span class="status success">SUCCESS</span> Iter: ${data.iterations}, Searches: ${data.searches}<br>Residual: ${data.residual.toFixed(6)}`;
+                    animateJoints(data.q);
+                } else {
+                    resultDiv.innerHTML = `<span class="status failure">FAILED</span> ${data.reason}`;
+                }
+            } catch (e) {
+                console.error('IK error:', e);
+            }
+        }
+
+        function animateJoints(target) {
+            const steps = 50;
+            const start = jointAngles.slice();
+            for (let s = 0; s <= steps; s++) {
+                setTimeout(() => {
+                    const t = s / steps;
+                    for (let i = 0; i < 6; i++) {
+                        jointAngles[i] = start[i] * (1 - t) + target[i] * t;
+                        const slider = document.getElementById(`jc-${i}`);
+                        if (slider) {
+                            slider.value = jointAngles[i];
+                            document.getElementById(`jv-${i}`).textContent = jointAngles[i].toFixed(3);
+                        }
+                    }
+                    updateRobot();
+                    updateFK();
+                }, s * 20);
+            }
+        }
+
+        function resetJoints() {
+            jointAngles = [0, 0, 0, 0, 0, 0];
+            for (let i = 0; i < 6; i++) {
+                const slider = document.getElementById(`jc-${i}`);
+                if (slider) {
+                    slider.value = 0;
+                    document.getElementById(`jv-${i}`).textContent = '0.000';
+                }
+            }
+            updateRobot();
+            updateFK();
+        }
+
+        function animateToHome() {
+            const home = [0, -1.57, 1.57, 0, 0, 0];
+            animateJoints(home);
+        }
+
+        function toggleAutoUpdate() {
+            autoUpdate = !autoUpdate;
+            const btn = document.querySelector('.btn[onclick="toggleAutoUpdate()"]');
+            btn.textContent = `Auto FK: ${autoUpdate ? 'ON' : 'OFF'}`;
+            btn.classList.toggle('active', autoUpdate);
+            if (autoUpdate) updateFK();
+        }
+
+        document.getElementById('servo-gain').addEventListener('input', (e) => {
+            document.getElementById('gain-value').textContent = parseFloat(e.target.value).toFixed(1);
+        });
+
+        async function toggleServo() {
+            if (servoInterval) {
+                clearInterval(servoInterval);
+                servoInterval = null;
+                document.getElementById('servo-btn').textContent = 'Start Servo';
+                document.getElementById('servo-btn').classList.remove('active');
+                return;
+            }
+            const gain = parseFloat(document.getElementById('servo-gain').value);
+            const target = [
+                parseFloat(document.getElementById('target-x').value),
+                parseFloat(document.getElementById('target-y').value),
+                parseFloat(document.getElementById('target-z').value)
+            ];
+            window.targetMarker.position.set(target[0], target[1], target[2]);
+            document.getElementById('servo-btn').textContent = 'Stop Servo';
+            document.getElementById('servo-btn').classList.add('active');
+            servoInterval = setInterval(async () => {
+                try {
+                    const resp = await fetch('/api/p_servo', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ qpos: jointAngles, target: [...target, 0, 0, 0], gain })
+                    });
+                    const data = await resp.json();
+                    document.getElementById('servo-status').innerHTML =
+                        `Vel: [${data.velocity.slice(0,3).map(v => v.toFixed(2)).join(', ')}] ${data.arrived ? '<span class="status success">ARRIVED</span>' : ''}`;
+                    if (!data.arrived) {
+                        for (let i = 0; i < 6; i++) {
+                            jointAngles[i] += data.velocity[i] * 0.05;
+                            jointAngles[i] = Math.max(JOINT_INFO[i].min, Math.min(JOINT_INFO[i].max, jointAngles[i]));
+                            const slider = document.getElementById(`jc-${i}`);
+                            if (slider) {
+                                slider.value = jointAngles[i];
+                                document.getElementById(`jv-${i}`).textContent = jointAngles[i].toFixed(3);
+                            }
+                        }
+                        updateRobot();
+                        updateFK();
+                    }
+                } catch (e) {
+                    console.error('Servo error:', e);
+                }
+            }, 50);
+        }
+
+        function onResize() {
+            const w = document.getElementById('viewer').clientWidth;
+            const h = document.getElementById('viewer').clientHeight;
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
