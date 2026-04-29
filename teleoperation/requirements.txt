@@ -1,0 +1,12 @@
+opencv-python
+mediapipe
+pyserial
+torch
+torchvision
+numpy
+# Servo SDK – install ONE of the following:
+scservo-sdk
+# feetech-servo-sdk
+# Depth Anything V2 – clone the repo and install locally:
+#   git clone https://github.com/DepthAnything/Depth-Anything-V2
+#   pip install -e Depth-Anything-V2
