@@ -470,7 +470,6 @@
 
             <!-- Vision Tracking -->
             <div class="sidebar-section">
-                <div class="section-title">{{ t('tracking.title') }}</div>
                 <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">Start camera to enable tracking</p>
                 <div class="tracking-controls">
                     <button class="tracking-btn" id="btn-face" onclick="startTracking('face')">{{ t('tracking.face') }}</button>
@@ -489,6 +488,21 @@
                 </div>
                 <div id="tracking-status" style="margin-top:12px;font-size:10px;color:var(--text-muted);">
                     {{ t('tracking.inactive') }}
+                </div>
+            </div>
+
+            <!-- MuJoCo Simulation -->
+            <div class="sidebar-section">
+                <div class="section-title">Simulation — MuJoCo</div>
+                <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">
+                    Opens the native 3-D viewer. Drag joints to drive the real arm.
+                </p>
+                <div class="tracking-controls">
+                    <button class="tracking-btn" id="btn-viewer-start" onclick="startViewer()">Launch Viewer</button>
+                    <button class="tracking-btn" id="btn-viewer-stop"  onclick="stopViewer()">Stop Viewer</button>
+                </div>
+                <div id="viewer-status" style="margin-top:10px;font-size:10px;color:var(--text-muted);">
+                    Viewer not running
                 </div>
             </div>
         </div>
@@ -520,6 +534,10 @@
         }
 
         // View Toggle
+        function flipCamera() {
+            const video = document.getElementById('video-feed');
+            video.classList.toggle('flipped');
+        }
         function setView(view) {
             const canvas = document.getElementById('main-canvas');
             const video = document.getElementById('video-feed');
@@ -533,7 +551,7 @@
                 btn3d.classList.remove('active');
                 btnCamera.classList.add('active');
                 modeDisplay.textContent = 'CAMERA MODE | TRACKING ACTIVE';
-                // Use tracking/teleop camera feed if active, otherwise gripper camera
+                // Route to the correct video feed based on what is active
                 let newSrc;
                 if (currentTeleop) {
                     newSrc = '/teleop/video_feed?' + Date.now();
@@ -542,12 +560,14 @@
                 } else {
                     newSrc = '/gripper_cam/video_feed?' + Date.now();
                 }
-                const currentSrc = video.src.split('?')[0];
-                const targetSrc = newSrc.split('?')[0];
-                if (!video.src || currentSrc !== targetSrc) {
+                // Compare paths only (video.src is browser-resolved to an absolute URL)
+                const currentPath = video.src ? new URL(video.src).pathname : '';
+                const targetPath = newSrc.split('?')[0];
+                if (currentPath !== targetPath) {
                     video.src = newSrc;
                 }
-                if (!currentTracking) {
+                // Start gripper camera if no tracking active
+                if (!currentTeleop && !currentTracking) {
                     fetch('/gripper_cam/start', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
@@ -675,38 +695,37 @@
                 });
             }
 
+            // Stop gripper camera before starting teleop/tracking
+            try {
+                await fetch('/gripper_cam/stop', { method: 'POST' });
+            } catch (e) {}
+
             btns.forEach(id => {
                 const btn = document.getElementById(id);
                 if (btn) btn.classList.remove('active');
             });
 
             try {
+                // Start the teleop script via API
                 const response = await fetch('/api/teleop/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
+                    body: JSON.stringify({ 
                         mode: mode,
                         cam_index: 0
                     })
                 });
 
-                if (response.ok) {
-                    currentTeleop = mode;
-                    setView('camera');
-                    const activeBtn = document.getElementById('btn-' + mode);
-                    if (activeBtn) activeBtn.classList.add('active');
-                    const modeLabel = mode.toUpperCase();
-                    statusEl.textContent = 'Teleoperation: ' + modeLabel + ' mode';
-                    statusEl.style.color = '#00ff88';
-                    PARC?.Toast?.show('Teleoperation started: ' + modeLabel, 'success');
-
-                    // Update video feed to teleop stream
-                    const video = document.getElementById('video-feed');
-                    video.src = '/teleop/video_feed?' + Date.now();
-                } else {
-                    statusEl.textContent = 'Error: ' + response.statusText;
-                    PARC?.Toast?.show('Failed to start teleoperation', 'error');
-                }
+                currentTeleop = mode;
+                currentTracking = null;
+                const activeBtn = document.getElementById('btn-' + mode);
+                if (activeBtn) activeBtn.classList.add('active');
+                const modeLabel = mode.toUpperCase();
+                statusEl.textContent = 'Teleoperation: ' + modeLabel + ' mode';
+                statusEl.style.color = '#00ff88';
+                PARC?.Toast?.show('Teleoperation started: ' + modeLabel, 'success');
+                // Switch to camera view so the MJPEG stream is visible
+                setView('camera');
             } catch (e) {
                 statusEl.textContent = 'Error: ' + e.message;
                 PARC?.Toast?.show('Teleoperation error: ' + e.message, 'error');
@@ -718,8 +737,10 @@
             const btns = ['btn-sign', 'btn-onehand', 'btn-twohands', 'btn-teleop-stop'];
 
             try {
+                // Stop the teleop script
                 await fetch('/api/teleop/stop', { method: 'POST' });
                 currentTeleop = null;
+                currentTracking = null;
                 btns.forEach(id => {
                     const btn = document.getElementById(id);
                     if (btn) btn.classList.remove('active');
@@ -1057,5 +1078,72 @@
                 document.getElementById('port-input').value = this.value;
             }
         });
+
+        // ── MuJoCo Viewer ──────────────────────────────────────────────────
+        let _viewerPoll = null;
+
+        function _updateViewerUI(running) {
+            const statusEl = document.getElementById('viewer-status');
+            const startBtn = document.getElementById('btn-viewer-start');
+            const stopBtn  = document.getElementById('btn-viewer-stop');
+            if (running) {
+                statusEl.textContent = 'Viewer running — drag joints to drive the arm';
+                statusEl.style.color = '#00ff88';
+                startBtn.classList.add('active');
+                stopBtn.classList.remove('active');
+            } else {
+                statusEl.textContent = 'Viewer not running';
+                statusEl.style.color = '';
+                startBtn.classList.remove('active');
+                stopBtn.classList.remove('active');
+            }
+        }
+
+        async function _pollViewer() {
+            try {
+                const r = await fetch('/api/viewer/status');
+                const d = await r.json();
+                _updateViewerUI(d.running);
+                if (!d.running && _viewerPoll) {
+                    clearInterval(_viewerPoll);
+                    _viewerPoll = null;
+                }
+            } catch (_) {}
+        }
+
+        async function startViewer() {
+            document.getElementById('viewer-status').textContent = 'Launching…';
+            document.getElementById('viewer-status').style.color = '#ff8800';
+            try {
+                const r = await fetch('/api/viewer/start', { method: 'POST' });
+                const d = await r.json();
+                if (d.ok) {
+                    PARC?.Toast?.show('MuJoCo viewer launched', 'success');
+                    if (!_viewerPoll) _viewerPoll = setInterval(_pollViewer, 2000);
+                    setTimeout(_pollViewer, 800);
+                } else {
+                    document.getElementById('viewer-status').textContent = 'Error: ' + (d.error || 'unknown');
+                    document.getElementById('viewer-status').style.color = '#ff4444';
+                    PARC?.Toast?.show('Viewer error: ' + (d.error || 'unknown'), 'error');
+                }
+            } catch (e) {
+                document.getElementById('viewer-status').textContent = 'Error: ' + e.message;
+                document.getElementById('viewer-status').style.color = '#ff4444';
+            }
+        }
+
+        async function stopViewer() {
+            try {
+                await fetch('/api/viewer/stop', { method: 'POST' });
+                if (_viewerPoll) { clearInterval(_viewerPoll); _viewerPoll = null; }
+                _updateViewerUI(false);
+                PARC?.Toast?.show('MuJoCo viewer stopped', 'success');
+            } catch (e) {
+                document.getElementById('viewer-status').textContent = 'Error: ' + e.message;
+            }
+        }
+
+        // Check viewer state on page load
+        _pollViewer();
     </script>
 {% endblock %}

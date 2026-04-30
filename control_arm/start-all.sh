@@ -32,7 +32,7 @@ echo ""
 echo "Starting Flask..."
 cd "$SCRIPT_DIR"
 LOG_DIR="$SCRIPT_DIR/logs"
-PYPATH="$SCRIPT_DIR/venv/bin/python"
+PYPATH="/usr/bin/python3.10"
 if [ ! -f "$PYPATH" ]; then
     PYPATH="$SCRIPT_DIR/.venv/bin/python"
 fi

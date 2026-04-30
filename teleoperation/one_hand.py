@@ -8,11 +8,37 @@ sys.path.insert(0, str(SDK_PATH))
 import cv2
 import mediapipe as mp
 import numpy as np
-from scservo_sdk import PortHandler, PacketHandler
+from scservo_sdk import PortHandler, sms_sts
+import sys
+import os
+import time
+
+# --- STREAMING MODE ---
+STREAM_MODE = os.environ.get('TELEOP_STREAM', '0') == '1'
+NO_CAMERA = os.environ.get('TELEOP_NOCALIB', '0') == '1'
+TARGET_FPS = 30
+_ENCODE_PARAMS = [int(cv2.IMWRITE_JPEG_QUALITY), 70]
+
+# In stream mode stdout is binary MJPEG — redirect print() to stderr
+if STREAM_MODE:
+    import builtins as _builtins
+    _real_print = _builtins.print
+    def _stderr_print(*args, **kwargs):
+        kwargs.setdefault('file', sys.stderr)
+        _real_print(*args, **kwargs)
+    _builtins.print = _stderr_print
+
+def stream_frame(frame):
+    """Output frame as MJPEG to stdout"""
+    _, buf = cv2.imencode('.jpg', frame, _ENCODE_PARAMS)
+    sys.stdout.buffer.write(b'--frame\r\nContent-Type: image/jpeg\r\n\r\n')
+    sys.stdout.buffer.write(buf.tobytes())
+    sys.stdout.buffer.write(b'\r\n')
+    sys.stdout.buffer.flush()
 
 # --- CONFIGURATION ---
 import os
-PORT = os.environ.get('TELEOP_PORT', 'COM6')
+PORT = os.environ.get('TELEOP_PORT', '/dev/ttyACM0')
 BAUD = int(os.environ.get('TELEOP_BAUD', '1000000'))
 ADDR_TORQUE_ENABLE = 40
 ADDR_GOAL_POSITION = 42
@@ -34,22 +60,23 @@ BOX_Y_MIN, BOX_Y_MAX = 0.15, 0.85  # Hauteur augmentée (de 15% à 85% de l'écr
 class RoboticArm:
     def __init__(self):
         self.port = PortHandler(PORT)
-        self.packet = PacketHandler(0)
-        self.is_tracking = False 
-        
+        self.is_tracking = False
+
         if not (self.port.openPort() and self.port.setBaudRate(BAUD)):
             print("[ERR] Connexion échouée.")
             exit()
-        
+
+        self.packet = sms_sts(self.port)  # must be created after port open
+
         for s_id in INITIAL_STANCE.keys():
-            self.packet.write1ByteTxRx(self.port, s_id, ADDR_TORQUE_ENABLE, 1)
-        
+            self.packet.write1ByteTxRx(s_id, ADDR_TORQUE_ENABLE, 1)
+
         self.current_pos = INITIAL_STANCE.copy()
         self.reset_to_initial()
 
     def move_servo(self, s_id, pos):
         pos = int(np.clip(pos, 0, 4095))
-        self.packet.write2ByteTxRx(self.port, s_id, ADDR_GOAL_POSITION, pos)
+        self.packet.WritePosEx(s_id, pos, 300, 50)
 
     def reset_to_initial(self):
         print("[ACTION] Réinitialisation...")
@@ -69,12 +96,23 @@ class RoboticArm:
 
 def main():
     arm = RoboticArm()
+    # Auto-activate tracking when launched from webapp (stream mode)
+    if STREAM_MODE:
+        arm.is_tracking = True
+
     mp_hands = mp.solutions.hands
     hands = mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.7, min_tracking_confidence=0.7)
-    cap = cv2.VideoCapture(0)
+
+    cam_idx = int(os.environ.get('TELEOP_CAM_INDEX', '0'))
+    cap = cv2.VideoCapture(cam_idx)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     last_wrist_pos = None
+    _frame_dt = 1.0 / TARGET_FPS
 
     while cap.isOpened():
+        t0 = time.monotonic()
         success, frame = cap.read()
         if not success: break
 
@@ -146,24 +184,36 @@ def main():
                 
                 mp.solutions.drawing_utils.draw_landmarks(frame, hand_lms, mp_hands.HAND_CONNECTIONS)
 
-        cv2.imshow("Interface SO-101 MediaPipe", frame)
-        
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'): break
-        elif key == ord('r'):
-            arm.reset_to_initial()
-            last_wrist_pos = None
-        elif key == ord('b'):
-            if not arm.is_tracking and results.multi_hand_landmarks:
-                w_check = results.multi_hand_landmarks[0].landmark[mp_hands.HandLandmark.WRIST]
-                if (BOX_X_MIN < w_check.x < BOX_X_MAX) and (BOX_Y_MIN < w_check.y < BOX_Y_MAX):
-                    arm.is_tracking = True
-            else:
-                arm.is_tracking = False
+        # Output frame - stream to stdout or display locally
+        if STREAM_MODE:
+            stream_frame(frame)
+        else:
+            cv2.imshow("Interface SO-101 MediaPipe", frame)
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'): break
+            elif key == ord('r'):
+                arm.reset_to_initial()
                 last_wrist_pos = None
+            elif key == ord('b'):
+                if not arm.is_tracking and results.multi_hand_landmarks:
+                    w_check = results.multi_hand_landmarks[0].landmark[mp_hands.HandLandmark.WRIST]
+                    if (BOX_X_MIN < w_check.x < BOX_X_MAX) and (BOX_Y_MIN < w_check.y < BOX_Y_MAX):
+                        arm.is_tracking = True
+                else:
+                    arm.is_tracking = False
+                    last_wrist_pos = None
+
+        # FPS cap — sleep the remainder of the frame budget
+        elapsed = time.monotonic() - t0
+        remaining = _frame_dt - elapsed
+        if remaining > 0:
+            time.sleep(remaining)
 
     cap.release()
-    cv2.destroyAllWindows()
+    if not STREAM_MODE:
+        cv2.destroyAllWindows()
+    else:
+        sys.stdout.buffer.flush()
 
 if __name__ == "__main__":
     main()

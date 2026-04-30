@@ -2,7 +2,7 @@
 SO-101 Robot Controller - Flask version
 Run: python app.py  →  http://localhost:5000
 """
-import sys, os, time, threading, queue, json, subprocess, signal
+import sys, os, time, threading, queue, json, subprocess, signal, select
 from pathlib import Path
 SDK_PATH = Path(__file__).parent / "stservo-env"
 if not SDK_PATH.exists():
@@ -253,7 +253,7 @@ class Robot:
         return position, rotation
 
     @staticmethod
-    def compute_ik(target_position: list, target_rotation: list = None, initial_joints: dict = None, max_iterations: int = 100, tolerance: float = 0.001) -> dict:
+    def compute_ik(target_position: list, target_rotation: list = None, initial_joints: dict = None, max_iterations: int = 300, tolerance: float = 0.005) -> dict:
         """
         Compute Inverse Kinematics using Jacobian Transpose method.
 
@@ -1442,29 +1442,30 @@ class TeleopThread(threading.Thread):
             robot_port = self.port or state['settings'].get('port', '/dev/ttyUSB0')
             robot_baud = state['settings'].get('baudrate', 1000000)
 
-        # Start the teleoperation script as subprocess
-        # Pass port as argument - scripts need to accept --port or similar
-        # For now, we'll modify the environment
+        # Start the teleoperation script for ROBOT CONTROL
+        # Note: Script handles its own camera + MediaPipe and streams MJPEG to stdout
         env = os.environ.copy()
         env['TELEOP_PORT'] = robot_port
         env['TELEOP_BAUD'] = str(robot_baud)
-        # Disable GUI for headless operation
-        env['QT_QPA_PLATFORM'] = 'offscreen'
-        env['OPENCV_VIDEOIO_DEBUG'] = '1'
+        env['TELEOP_STREAM'] = '1'           # enable MJPEG-to-stdout mode
+        env['TELEOP_CAM_INDEX'] = str(self.cam_index)
+        env['PYTHONUNBUFFERED'] = '1'        # no stdout buffering on the pipe
+
+        # Use conda Python (has correct NumPy)
+        CONDA_PYTHON = "/home/parc/miniconda3/envs/py310_ml/bin/python"
 
         try:
             self.process = subprocess.Popen(
-                [sys.executable, str(script_path)],
+                [CONDA_PYTHON, '-u', str(script_path)],  # -u: unbuffered stdout
                 cwd=str(teleop_dir),
                 env=env,
-                stdout=subprocess.PIPE,
+                stdout=subprocess.PIPE,      # was DEVNULL — read_frames() needs this
                 stderr=subprocess.PIPE
             )
-            log(f"Started teleop script: {script} on port {robot_port}")
-            # Log any stderr output in a separate thread
+            log(f"Started teleop script: {script}")
+            
+            # Log stderr in background
             def log_stderr():
-                import select
-                import io
                 import threading
                 def read_stderr():
                     try:
@@ -1476,29 +1477,52 @@ class TeleopThread(threading.Thread):
         except Exception as e:
             log(f"Failed to start teleop script: {e}")
 
-        # Also capture camera for video feed display
-        self._cap = cv2.VideoCapture(self.cam_index)
-        if not self._cap.isOpened():
-            log(f"Failed to open camera {self.cam_index} for teleop video - trying default camera")
-            self._cap = cv2.VideoCapture(0)  # Try default
-            if not self._cap.isOpened():
-                log(f"Failed to open any camera for teleop video")
-                self.running = False
-                return
+        self._cap = None
 
-        self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        # Read MJPEG from subprocess stdout — store raw JPEG bytes (no decode)
+        self._stream_buf = b''
+        BOUNDARY = b'--frame'
 
+        def read_frames():
+            buf = b''
+            while self.running and self.process and self.process.poll() is None:
+                try:
+                    chunk = self.process.stdout.read(65536)
+                    if not chunk:
+                        time.sleep(0.005)
+                        continue
+                    buf += chunk
+                    # Extract all complete MJPEG frames; keep only the latest
+                    latest_jpeg = None
+                    while True:
+                        s = buf.find(BOUNDARY)
+                        if s == -1:
+                            break
+                        e = buf.find(BOUNDARY, s + len(BOUNDARY))
+                        if e == -1:
+                            buf = buf[s:]   # keep incomplete tail
+                            break
+                        part = buf[s:e]
+                        buf = buf[e:]
+                        sep = part.find(b'\r\n\r\n')
+                        if sep != -1:
+                            jpeg = part[sep + 4:]
+                            if len(jpeg) > 500:
+                                latest_jpeg = jpeg  # discard older frames
+                    if latest_jpeg is not None:
+                        with self.frame_lock:
+                            self.frame = latest_jpeg  # raw JPEG bytes
+                except Exception:
+                    break
+        
+        import threading
+        threading.Thread(target=read_frames, daemon=True).start()
+
+        # Keep thread alive while running
         while self.running:
-            if self._cap and self._cap.isOpened():
-                ret, frame = self._cap.read()
-                if ret:
-                    with self.frame_lock:
-                        self.frame = frame.copy()
-            time.sleep(0.033)
+            time.sleep(0.5)
 
-        if self._cap:
-            self._cap.release()
+        # Cleanup
         if self.process:
             self.process.terminate()
             try:
@@ -1509,10 +1533,22 @@ class TeleopThread(threading.Thread):
 
     def stop(self):
         self.running = False
+        if self._cap:
+            self._cap.release()
+            self._cap = None
+        if self.process:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+            self.process = None
+        log(f"Teleop stopped: {self.mode}")
 
     def get_frame(self):
+        # Returns raw JPEG bytes or None — callers serve them directly (no re-encode)
         with self.frame_lock:
-            return self.frame.copy() if self.frame is not None else None
+            return self.frame  # bytes, not numpy
 
 # ── Global app state ──────────────────────────────────────────────────────────
 _state_lock = threading.Lock()
@@ -1588,7 +1624,7 @@ def video_feed():
 def gripper_cam_start():
     """Start the gripper camera."""
     data = request.json or {}
-    cam_index = data.get('cam_index', state['settings'].get('gripper_cam_index', 1))
+    cam_index = data.get('cam_index', state['settings'].get('gripper_cam_index', 0))
 
     with _state_lock:
         if state['gripper_cam'] is None:
@@ -1623,16 +1659,24 @@ def gripper_cam_frame():
 @app.route('/gripper_cam/video_feed')
 def gripper_cam_video_feed():
     """MJPEG stream from gripper camera - raw feed without detection for speed."""
+    _enc = [cv2.IMWRITE_JPEG_QUALITY, 75]
+    placeholder = _get_placeholder()
     def generate():
         while True:
+            t0 = time.monotonic()
             gripper_cam = state.get('gripper_cam')
             if gripper_cam and gripper_cam.running:
-                frame = gripper_cam.get_frame()  # Raw frame, no YOLO detection
+                frame = gripper_cam.get_frame()
                 if frame is not None:
-                    import cv2
-                    _, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+                    _, buf = cv2.imencode('.jpg', frame, _enc)
                     yield b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buf.tobytes() + b'\r\n'
-            time.sleep(0.033)
+                    elapsed = time.monotonic() - t0
+                    remaining = 0.033 - elapsed
+                    if remaining > 0:
+                        time.sleep(remaining)
+                    continue
+            yield b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + placeholder + b'\r\n'
+            time.sleep(0.1)
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/gripper_cam/detect', methods=['POST'])
@@ -1872,9 +1916,20 @@ def api_sim_ik():
     Returns: {'joints': {...}, 'error': float, 'success': bool}
     """
     data = request.json or {}
-    position = data.get('position', [0, 0, 0.3])
+    # accept both 'position' and legacy 'target' key
+    position = data.get('position') or data.get('target', [0, 0, 0.3])
     rotation = data.get('rotation')
     initial_joints = data.get('initial_joints')
+
+    # Default initial_joints to current robot state for faster convergence
+    if initial_joints is None and state['connected'] and state.get('robot'):
+        try:
+            robot = state['robot']
+            js = robot.get_joint_states()
+            if js:
+                initial_joints = js['joints']
+        except Exception:
+            pass
 
     result = Robot.compute_ik(position, rotation, initial_joints)
     return jsonify(result)
@@ -2372,6 +2427,63 @@ def api_tracking_stop():
     return jsonify({'ok': True})
 
 # ── Teleoperation ────────────────────────────────────────────────────────────
+@app.route('/api/teleop/run', methods=['POST'])
+def api_teleop_run():
+    """
+    Run a teleoperation Python script directly.
+    """
+    import subprocess
+    data = request.json or {}
+    mode = data.get('mode', 'onehand')
+    port = data.get('port', '/dev/ttyUSB0')
+    
+    script_map = {
+        "sign": "sign_gesture.py",
+        "onehand": "one_hand.py", 
+        "twohands": "two_hands.py"
+    }
+    
+    script = script_map.get(mode)
+    if not script:
+        return jsonify({'ok': False, 'error': 'Unknown mode'})
+    
+    script_path = Path(__file__).parent.parent / "teleoperation" / script
+    if not script_path.exists():
+        return jsonify({'ok': False, 'error': f'Script not found: {script}'})
+    
+    # Kill any existing teleop process
+    with _state_lock:
+        if state.get('teleop_process'):
+            try:
+                state['teleop_process'].terminate()
+            except:
+                pass
+            state['teleop_process'] = None
+    
+    # Run via conda environment - use direct path to conda python
+    script_dir = "/home/parc/parc_final/teleoperation"
+    CONDA_PYTHON = "/home/parc/miniconda3/envs/py310_ml/bin/python"
+    
+    env = os.environ.copy()
+    env['TELEOP_PORT'] = port
+    
+    try:
+        # Directly call the conda env's python
+        proc = subprocess.Popen(
+            [CONDA_PYTHON, script],
+            cwd=script_dir,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True
+        )
+        with _state_lock:
+            state['teleop_process'] = proc
+        log(f"Started teleop script: {script} on port {port}")
+        return jsonify({'ok': True, 'mode': mode, 'pid': proc.pid})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
 @app.route('/api/teleop/start', methods=['POST'])
 def api_teleop_start():
     data = request.json or {}
@@ -2381,7 +2493,7 @@ def api_teleop_start():
     with _state_lock:
         if state['teleop']:
             state['teleop'].stop()
-            time.sleep(0.3)
+            time.sleep(1.0)   # give OS time to release the camera fd
         teleop = TeleopThread(mode, cam_index)
         teleop.start()
         state['teleop'] = teleop
@@ -2390,28 +2502,36 @@ def api_teleop_start():
 @app.route('/api/teleop/stop', methods=['POST'])
 def api_teleop_stop():
     with _state_lock:
-        if state['teleop']:
+        # Kill subprocess
+        if state.get('teleop_process'):
+            try:
+                state['teleop_process'].terminate()
+                state['teleop_process'].wait(timeout=2)
+            except:
+                try:
+                    state['teleop_process'].kill()
+                except: pass
+            state['teleop_process'] = None
+        # Also stop TeleopThread if running
+        if state.get('teleop'):
             state['teleop'].stop()
             state['teleop'] = None
     return jsonify({'ok': True})
 
 @app.route('/teleop/video_feed')
 def teleop_video_feed():
+    placeholder = _get_placeholder()
     def generate():
         while True:
+            t0 = time.monotonic()
             with _state_lock:
                 teleop = state.get('teleop')
-            if teleop and teleop.running:
-                frame = teleop.get_frame()
-                if frame is not None:
-                    import cv2
-                    _, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
-                    yield b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buf.tobytes() + b'\r\n'
-                else:
-                    log("Teleop frame is None")
-            else:
-                log(f"Teleop not running: teleop={teleop}")
-            time.sleep(0.033)
+            jpeg = (teleop.get_frame() if teleop and teleop.running else None) or placeholder
+            yield b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + jpeg + b'\r\n'
+            elapsed = time.monotonic() - t0
+            remaining = 0.033 - elapsed  # target ~30 fps
+            if remaining > 0:
+                time.sleep(remaining)
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 # ── Settings ─────────────────────────────────────────────────────────────────
@@ -2824,17 +2944,42 @@ def api_viewer_start():
         if not _VIEWER_SCRIPT.exists():
             return jsonify({'ok': False, 'error': f'viewer.py not found at {_VIEWER_SCRIPT}'})
         try:
-            # Use the conda/system Python that has mujoco, not the Flask venv Python
-            viewer_python = os.environ.get('CONDA_PYTHON_EXE') or 'python3'
+            # miniconda base has mujoco 3.8; py310_ml does not — use base
+            viewer_python = '/home/parc/miniconda3/bin/python'
             env = os.environ.copy()
             env.setdefault('DISPLAY', ':1')
             env['SO101_DIR'] = str(Path(__file__).parent.parent / 'simulation' / 'so101-inverse-kinematics-main' / 'so101')
+            # PYTHONPATH inherits the system python3.10 user-site path which
+            # breaks numpy ABI under Python 3.13 — clear it for this subprocess
+            env.pop('PYTHONPATH', None)
             _viewer_proc = subprocess.Popen(
                 [viewer_python, str(_VIEWER_SCRIPT), '--controller', 'http://127.0.0.1:5000'],
                 cwd=str(_VIEWER_SCRIPT.parent),
                 env=env,
+                stderr=subprocess.PIPE,
             )
             log(f"MuJoCo viewer started (pid {_viewer_proc.pid}) via {viewer_python}")
+            # log stderr in background so errors surface in the webapp log
+            def _log_viewer_stderr():
+                for line in _viewer_proc.stderr:
+                    log(f"[viewer] {line.decode().rstrip()}")
+            threading.Thread(target=_log_viewer_stderr, daemon=True).start()
+            # Move real robot to the viewer launch stance
+            _VIEWER_INIT_STANCE = {
+                "shoulder_pan":  0,
+                "shoulder_lift": 80,
+                "elbow_flex":   -89,
+                "wrist_flex":    0,
+                "wrist_roll":    90,
+                "gripper":       0,
+            }
+            robot = state.get('robot')
+            if state.get('connected') and robot:
+                try:
+                    robot.send_positions(_VIEWER_INIT_STANCE)
+                    log("Viewer launch: real robot moved to initial stance")
+                except Exception as re:
+                    log(f"Viewer launch: could not move robot: {re}")
         except Exception as e:
             return jsonify({'ok': False, 'error': str(e)})
     return jsonify({'ok': True})

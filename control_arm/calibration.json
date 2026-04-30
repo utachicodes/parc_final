@@ -2,7 +2,7 @@
   "limits_deg": {
     "shoulder_pan": {
       "min": -89.8,
-      "ctr": -0.1,
+      "ctr": 0.4,
       "max": 89.7
     },
     "shoulder_lift": {
@@ -48,7 +48,7 @@
     "gripper": 3068
   },
   "center_pos": {
-    "shoulder_pan": 2047,
+    "shoulder_pan": 2052,
     "shoulder_lift": 2268,
     "elbow_flex": 1552,
     "wrist_flex": 1632,
