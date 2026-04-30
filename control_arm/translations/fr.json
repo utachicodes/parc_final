@@ -24,12 +24,6 @@
       "tag1": "Cours",
       "tag2": "Tutoriels"
     },
-    "practical": {
-      "title": "Pratique",
-      "desc": "Environnement de programmation pratique avec scripts Python, blocs de code visuel, visualisation 3D en temps reel, flux camera du robot et assistant IA equipe de Llama pour vous guider.",
-      "tag1": "Programmation",
-      "tag2": "Assistant IA"
-    },
     "play": {
       "title": "Jouer",
       "desc": "Interface de controle direct du robot avec curseurs articulaires, poses predefinies, actions rapides et visualisation 3D en temps reel. Surveillez la position de l'effecteur et executez des modes de mouvement pre-integres.",
@@ -174,35 +168,6 @@
     "ai_tutor_greeting": "Bonjour! Je suis votre tuteur IA. Posez-moi vos questions sur la robotique, la cinematique, la programmation ou le bras SO-101.",
     "ai_tutor_placeholder": "Posez une question au tuteur IA..."
   },
-"practical": {
-    "title": "Pratique",
-    "code_editor": "Editeur de Code",
-    "robot_camera": "Camera du Robot",
-    "run": "Executer le Code",
-    "clear": "Effacer",
-    "camera_off": "Camera eteinte",
-    "connect_camera": "Connecter Camera",
-    "disconnect_camera": "Deconnecter",
-    "analyze_scene": "Analyser la Scene",
-    "detect_objects": "Detecter Objets",
-    "ai_greeting": "Bonjour! Je suis votre assistant IA ejcu par LFM2.5 sur votre Jetson Orin Nano. Posez-moi vos questions sur la robotique, la programmation Python ou le bras SO-101.",
-    "ai_placeholder": "Interrogez l'assistant IA...",
-    "ai_connecting": "Connexion au serveur IA...",
-    "ai_offline": "Serveur IA hors ligne",
-    "ai_models": "Modeles LFM2.5",
-    "vision": "Analyse Vision",
-    "vision_analyze": "Analyser la Scene",
-    "voice_command": "Commande Vocale",
-"start_recording": "Demarrer l'enregistrement",
-    "stop_recording": "Arreter l'enregistrement",
-    "execute_command": "Executer la Commande",
-    "voice_settings": "Parametres Vocaux",
-    "voice_language": "Langue Vocale",
-    "speak_response": "Lire la Reponse",
-    "pieces": "Pieces et Modes",
-    "documentation": "Documentation",
-    "select_piece": "Selectionnez une piece pour voir la documentation"
-  },
   "settings": {
     "title": "Parametres",
     "subtitle": "Configurez vos preferences",
@@ -293,8 +258,6 @@
       "failed_to_preview_voice": "Echec de l'apercu vocal",
       "failed_to_download_voice": "Echec du telechargement vocal",
       "connection_failed": "Connexion echouee",
-      "code_executed_successfully": "Code execute avec succes",
-      "failed_to_execute_code": "Echec de l'execution du code",
       "error_occurred": "Erreur survenue",
       "camera_access_denied": "Acces camera refuse",
       "camera_not_connected": "Camera non connectee",
@@ -303,7 +266,6 @@
       "ik_solution_applied": "Solution IK appliquee",
       "robot_reset": "Robot reinitialise a la position zero",
       "connected_to_robot": "Connecte au robot",
-      "command_added_to_editor": "Commande ajoutee a l'editeur",
       "voice_downloaded_successfully": "Voix telechargee avec succes"
     },
     "calibration": {

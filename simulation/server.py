@@ -17,7 +17,7 @@ import numpy as np
 import mujoco
 import websockets
 
-SO101_DIR = os.environ.get("SO101_DIR", "/home/parc/Desktop/InverseKinematics/so101-inverse-kinematics-main/so101")
+SO101_DIR = os.environ.get("SO101_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "so101-inverse-kinematics-main", "so101"))
 WEB_DIR   = os.environ.get("WEB_DIR",   os.path.join(os.path.dirname(os.path.abspath(__file__)), "web"))
 STL_DIR   = os.path.join(SO101_DIR, "assets")
 PORT      = int(os.environ.get("HTTP_PORT", 38000))

@@ -636,10 +636,6 @@
             justify-content: flex-end;
         }
     </style>
-    <script>
-        window.__TRANSLATIONS__ = {{ en_json | tojson }};
-        window.__CURRENT_LANG__ = "{{ lang }}";
-    </script>
 {% endblock %}
 {% block content %}
     <main style="height: calc(100vh - var(--hdr-h)); overflow-y: auto; padding: 40px;">
@@ -698,27 +694,6 @@
                 </div>
             </div>
 
-            <!-- Notifications Section -->
-            <div class="settings-section">
-                <div class="settings-section-title">{{ t('settings.notifications') }}</div>
-                
-                <div class="setting-row">
-                    <div class="setting-info">
-                        <h4>{{ t('settings.notif_sound') }}</h4>
-                        <p>{{ t('settings.notif_sound_desc') }}</p>
-                    </div>
-                    <div class="toggle active" onclick="this.classList.toggle('active')"></div>
-                </div>
-
-                <div class="setting-row">
-                    <div class="setting-info">
-                        <h4>{{ t('settings.notif_toast') }}</h4>
-                        <p>{{ t('settings.notif_toast_desc') }}</p>
-                    </div>
-                    <div class="toggle active" onclick="this.classList.toggle('active')"></div>
-                </div>
-            </div>
-
             <!-- About Section -->
             <div class="settings-section">
                 <div class="settings-section-title">{{ t('settings.about') }}</div>
@@ -748,55 +723,55 @@
 
             <!-- Calibration Section -->
             <div class="settings-section">
-                <div class="settings-section-title">{{ t('calibration.title') }}</div>
-                <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">{{ t('calibration.subtitle') }}</p>
+                <div class="settings-section-title">{{ t('settings.calibration.title') }}</div>
+                <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">{{ t('settings.calibration.subtitle') }}</p>
 
                 <div class="setting-row">
                     <div class="setting-info">
                         <h4>{{ t('status.connected') }}</h4>
                         <p id="cal-conn-status">{{ t('status.not_connected') }}</p>
                     </div>
-                    <span class="badge" id="cal-badge">{{ t('calibration.not_calibrated') }}</span>
+                    <span class="badge" id="cal-badge">{{ t('settings.calibration.not_calibrated') }}</span>
                 </div>
 
                 <div id="cal-controls" style="display:none;">
                     <div class="setting-row">
                         <div class="setting-info">
-                            <h4>{{ t('calibration.sweep_speed') }}</h4>
-                            <p style="font-size:11px;color:var(--text-muted);">{{ t('calibration.sweep_speed') }}: <span id="sweep-speed-val">800</span></p>
+                            <h4>{{ t('settings.calibration.sweep_speed') }}</h4>
+                            <p style="font-size:11px;color:var(--text-muted);">{{ t('settings.calibration.sweep_speed') }}: <span id="sweep-speed-val">800</span></p>
                         </div>
                         <input type="range" id="sweep-speed" min="200" max="1500" value="800" step="50" style="width:150px;" oninput="document.getElementById('sweep-speed-val').textContent=this.value">
                     </div>
 
                     <div style="display:flex;gap:12px;margin-bottom:20px;">
                         <button class="btn btn-primary" id="btn-calibrate" onclick="startCalibration()">
-                            {{ t('calibration.calibrate') }}
+                            {{ t('settings.calibration.calibrate') }}
                         </button>
                         <button class="btn btn-secondary" id="btn-stop-cal" onclick="stopCalibration()" style="display:none;">
-                            {{ t('calibration.stop') }}
+                            {{ t('settings.calibration.stop') }}
                         </button>
                         <button class="btn btn-ghost" onclick="loadCalibration()">
-                            {{ t('calibration.load') }}
+                            {{ t('settings.calibration.load') }}
                         </button>
                         <button class="btn btn-ghost" onclick="saveCalibration()">
-                            {{ t('calibration.save') }}
+                            {{ t('settings.calibration.save') }}
                         </button>
                         <button class="btn btn-ghost" onclick="resetToCenter()">
-                            {{ t('calibration.reset') }}
+                            {{ t('settings.calibration.reset') }}
                         </button>
                     </div>
 
                     <!-- Servo Limits Table -->
                     <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:16px;">
-                        <h4 style="font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:12px;">{{ t('calibration.servo_limits') }}</h4>
+                        <h4 style="font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:12px;">{{ t('settings.calibration.servo_limits') }}</h4>
                         <div style="overflow-x:auto;">
                             <table style="width:100%;border-collapse:collapse;font-size:11px;" id="servo-limits-table">
                                 <thead>
                                     <tr style="border-bottom:1px solid var(--border);">
                                         <th style="text-align:left;padding:8px;color:var(--text-muted);font-weight:600;">Servo</th>
-                                        <th style="text-align:center;padding:8px;color:var(--text-muted);font-weight:600;">{{ t('calibration.min_angle') }}</th>
-                                        <th style="text-align:center;padding:8px;color:var(--text-muted);font-weight:600;">{{ t('calibration.center_angle') }}</th>
-                                        <th style="text-align:center;padding:8px;color:var(--text-muted);font-weight:600;">{{ t('calibration.max_angle') }}</th>
+                                        <th style="text-align:center;padding:8px;color:var(--text-muted);font-weight:600;">{{ t('settings.calibration.min_angle') }}</th>
+                                        <th style="text-align:center;padding:8px;color:var(--text-muted);font-weight:600;">{{ t('settings.calibration.center_angle') }}</th>
+                                        <th style="text-align:center;padding:8px;color:var(--text-muted);font-weight:600;">{{ t('settings.calibration.max_angle') }}</th>
                                         <th style="text-align:center;padding:8px;color:var(--text-muted);font-weight:600;">Actions</th>
                                     </tr>
                                 </thead>
@@ -808,7 +783,7 @@
                     </div>
 
                     <div id="cal-log" style="background:var(--bg4);border:1px solid var(--border);border-radius:var(--r);padding:12px;max-height:200px;overflow-y:auto;font-family:var(--mono);font-size:10px;color:var(--text-muted);">
-                        <div style="color:var(--text-dim);">{{ t('calibration.calibration_saved') }}: --</div>
+                        <div style="color:var(--text-dim);">{{ t('settings.calibration.calibration_saved') }}: --</div>
                     </div>
                 </div>
             </div>
@@ -1102,17 +1077,6 @@
             if (e.key === 'Escape') closeModal();
         });
 
-        function t(key) {
-            const trans = window.__TRANSLATIONS__[window.__CURRENT_LANG__] || {};
-            const keys = key.split('.');
-            let val = trans;
-            for (const k of keys) {
-                if (val && typeof val === 'object') val = val[k];
-                else return key;
-            }
-            return typeof val === 'string' ? val : key;
-        }
-
         // Voice Settings
         let currentVoice = 'en_US-lessac-medium';
         let voiceSettings = {
@@ -1256,10 +1220,10 @@ loadVoiceSettings();
                 }
 
                 if (data.calibrated) {
-                    calBadge.textContent = '{{ t('calibration.calibrated') }}';
+                    calBadge.textContent = '{{ t('settings.calibration.calibrated') }}';
                     calBadge.className = 'badge b-green';
                 } else {
-                    calBadge.textContent = '{{ t('calibration.not_calibrated') }}';
+                    calBadge.textContent = '{{ t('settings.calibration.not_calibrated') }}';
                     calBadge.className = 'badge b-red';
                 }
             } catch (e) {
