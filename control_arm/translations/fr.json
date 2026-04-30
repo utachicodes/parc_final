@@ -343,7 +343,10 @@
       "inactive": "Suivi: Inactif",
       "active": "Suivi: mode {mode}",
       "no_detection": "Pas de {mode} detecte",
-      "start_tracking": "Demarrer le Suivi"
+      "start_tracking": "Demarrer le Suivi",
+      "sign": "Signe",
+      "onehand": "Une Main",
+      "twohands": "Deux Mains"
     }
   },
   "modal": {

@@ -343,7 +343,10 @@
       "inactive": "Tracking: Inactive",
       "active": "Tracking: {mode} mode",
       "no_detection": "No {mode} detected",
-      "start_tracking": "Start Tracking"
+      "start_tracking": "Start Tracking",
+      "sign": "Sign",
+      "onehand": "One Hand",
+      "twohands": "Two Hands"
     }
   },
   "modal": {

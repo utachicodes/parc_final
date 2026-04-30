@@ -36,8 +36,9 @@ except ImportError:
         SERVO_SDK = None
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-DEFAULT_PORT  = "COM6"
-DEFAULT_BAUD  = 1_000_000
+import os
+DEFAULT_PORT  = os.environ.get('TELEOP_PORT', 'COM6')
+DEFAULT_BAUD  = int(os.environ.get('TELEOP_BAUD', '1000000'))
 DEPTH_MODEL_PATH = "depth_anything_v2_vitb.pth"
 
 # SO-101 servo IDs

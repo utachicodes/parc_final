@@ -13,7 +13,7 @@ import numpy as np
 
 ASSETS_DIR = os.environ.get(
     "SO101_DIR",
-    "/home/parc/Desktop/InverseKinematics/so101-inverse-kinematics-main/so101",
+    "/home/parc/parc_final/simulation/so101-inverse-kinematics-main/so101",
 )
 XML_FILE = os.path.join(ASSETS_DIR, "so_101.xml")
 

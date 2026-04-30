@@ -389,25 +389,13 @@
                 <div id="joint-controls"></div>
             </div>
 
-            <!-- Quick Actions -->
-            <div class="sidebar-section">
-                <div class="section-title">{{ t('quick_actions.title') }}</div>
-                <div class="quick-grid">
-                    <button class="quick-btn" onclick="quickAction('home')">Home</button>
-                    <button class="quick-btn" onclick="quickAction('wave')">Wave</button>
-                    <button class="quick-btn" onclick="quickAction('grip')">Grip</button>
-                    <button class="quick-btn" onclick="quickAction('release')">Release</button>
-                    <button class="quick-btn" onclick="quickAction('ready')">Ready</button>
-                    <button class="quick-btn" onclick="quickAction('sleep')">Sleep</button>
-                </div>
-            </div>
         </div>
 
         <!-- Main Viewer -->
         <div class="main-viewer">
             <div class="view-toggle">
-                <button id="btn-3d" class="active" onclick="setView('3d')">3D VIEW</button>
-                <button id="btn-camera" onclick="setView('camera')">CAMERA</button>
+                <button id="btn-3d" onclick="setView('3d')">3D VIEW</button>
+                <button id="btn-camera" class="active" onclick="setView('camera')">CAMERA</button>
             </div>
             <div id="main-canvas"></div>
             <img id="video-feed" src="" alt="Camera Feed" style="display:none;" />
@@ -446,17 +434,13 @@
                         <h5>Zero Pose</h5>
                         <p>All joints at 0</p>
                     </button>
+                    <button class="mode-btn" onclick="setPreset('home')">
+                        <h5>Home</h5>
+                        <p>Custom home</p>
+                    </button>
                     <button class="mode-btn" onclick="setPreset('standard')">
                         <h5>Standard</h5>
                         <p>Ready position</p>
-                    </button>
-                    <button class="mode-btn" onclick="setPreset('forward')">
-                        <h5>Lean Forward</h5>
-                        <p>Reaching pose</p>
-                    </button>
-                    <button class="mode-btn" onclick="setPreset('wave')">
-                        <h5>Wave</h5>
-                        <p>Waving gesture</p>
                     </button>
                 </div>
             </div>
@@ -495,6 +479,13 @@
                     <button class="tracking-btn" id="btn-body" onclick="startTracking('body')">{{ t('tracking.body') }}</button>
                     <button class="tracking-btn" id="btn-pose-yolo" onclick="startTracking('pose_yolo')" style="background:#ff8800;border-color:#ff8800;color:white;">YOLO-Pose GPU</button>
                     <button class="tracking-btn" id="btn-stop" onclick="stopTracking()">{{ t('tracking.stop') }}</button>
+                </div>
+                <div class="section-title" style="margin-top:16px;">{{ t('tracking.title') }} - Teleoperation</div>
+                <div class="tracking-controls">
+                    <button class="tracking-btn" id="btn-sign" onclick="startTeleop('sign')">{{ t('tracking.sign') }}</button>
+                    <button class="tracking-btn" id="btn-onehand" onclick="startTeleop('onehand')">{{ t('tracking.onehand') }}</button>
+                    <button class="tracking-btn" id="btn-twohands" onclick="startTeleop('twohands')">{{ t('tracking.twohands') }}</button>
+                    <button class="tracking-btn" id="btn-teleop-stop" onclick="stopTeleop()">{{ t('tracking.stop') }}</button>
                 </div>
                 <div id="tracking-status" style="margin-top:12px;font-size:10px;color:var(--text-muted);">
                     {{ t('tracking.inactive') }}
@@ -542,8 +533,15 @@
                 btn3d.classList.remove('active');
                 btnCamera.classList.add('active');
                 modeDisplay.textContent = 'CAMERA MODE | TRACKING ACTIVE';
-                // Use tracking camera feed if tracking is active, otherwise gripper camera
-                const newSrc = currentTracking ? '/video_feed?' + Date.now() : '/gripper_cam/video_feed?' + Date.now();
+                // Use tracking/teleop camera feed if active, otherwise gripper camera
+                let newSrc;
+                if (currentTeleop) {
+                    newSrc = '/teleop/video_feed?' + Date.now();
+                } else if (currentTracking) {
+                    newSrc = '/video_feed?' + Date.now();
+                } else {
+                    newSrc = '/gripper_cam/video_feed?' + Date.now();
+                }
                 const currentSrc = video.src.split('?')[0];
                 const targetSrc = newSrc.split('?')[0];
                 if (!video.src || currentSrc !== targetSrc) {
@@ -651,6 +649,84 @@
                 statusEl.textContent = '{{ t('tracking.inactive') }}';
                 statusEl.style.color = '';
                 PARC?.Toast?.show('Tracking stopped', 'success');
+            } catch (e) {
+                statusEl.textContent = 'Error: ' + e.message;
+            }
+        }
+
+        // Teleoperation
+        let currentTeleop = null;
+
+        async function startTeleop(mode) {
+            const statusEl = document.getElementById('tracking-status');
+            const btns = ['btn-sign', 'btn-onehand', 'btn-twohands', 'btn-teleop-stop'];
+
+            // Stop any existing tracking first
+            if (currentTracking) {
+                await fetch('/api/tracking/stop', { method: 'POST' });
+                currentTracking = null;
+                if (trackingPollInterval) {
+                    clearInterval(trackingPollInterval);
+                    trackingPollInterval = null;
+                }
+                ['btn-face', 'btn-hand', 'btn-pose', 'btn-body', 'btn-pose-yolo', 'btn-stop'].forEach(id => {
+                    const btn = document.getElementById(id);
+                    if (btn) btn.classList.remove('active');
+                });
+            }
+
+            btns.forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.classList.remove('active');
+            });
+
+            try {
+                const response = await fetch('/api/teleop/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mode: mode,
+                        cam_index: 0
+                    })
+                });
+
+                if (response.ok) {
+                    currentTeleop = mode;
+                    setView('camera');
+                    const activeBtn = document.getElementById('btn-' + mode);
+                    if (activeBtn) activeBtn.classList.add('active');
+                    const modeLabel = mode.toUpperCase();
+                    statusEl.textContent = 'Teleoperation: ' + modeLabel + ' mode';
+                    statusEl.style.color = '#00ff88';
+                    PARC?.Toast?.show('Teleoperation started: ' + modeLabel, 'success');
+
+                    // Update video feed to teleop stream
+                    const video = document.getElementById('video-feed');
+                    video.src = '/teleop/video_feed?' + Date.now();
+                } else {
+                    statusEl.textContent = 'Error: ' + response.statusText;
+                    PARC?.Toast?.show('Failed to start teleoperation', 'error');
+                }
+            } catch (e) {
+                statusEl.textContent = 'Error: ' + e.message;
+                PARC?.Toast?.show('Teleoperation error: ' + e.message, 'error');
+            }
+        }
+
+        async function stopTeleop() {
+            const statusEl = document.getElementById('tracking-status');
+            const btns = ['btn-sign', 'btn-onehand', 'btn-twohands', 'btn-teleop-stop'];
+
+            try {
+                await fetch('/api/teleop/stop', { method: 'POST' });
+                currentTeleop = null;
+                btns.forEach(id => {
+                    const btn = document.getElementById(id);
+                    if (btn) btn.classList.remove('active');
+                });
+                statusEl.textContent = '{{ t('tracking.inactive') }}';
+                statusEl.style.color = '';
+                PARC?.Toast?.show('Teleoperation stopped', 'success');
             } catch (e) {
                 statusEl.textContent = 'Error: ' + e.message;
             }
@@ -926,11 +1002,9 @@
 
         function setPreset(preset) {
             const presets = {
-                home: [0, -100, 95, 72, 0, 0],
+                home: [0, -100, 123, 91, 0, 0],
                 zero: [0, 0, 0, 0, 0, 0],
-                standard: [0, -30, 60, -30, 0, 0],
-                forward: [0, -60, 90, -30, 0, 0],
-                wave: [0, -20, 45, -25, 30, 0]
+                standard: [0, -30, 60, -30, 0, 0]
             };
             if (presets[preset]) {
                 presets[preset].forEach((v, i) => {

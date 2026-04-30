@@ -4,8 +4,9 @@ import math
 import numpy as np
 
 # ── 1. CONFIGURATION ──
-PORT = "COM6"
-BAUD = 1_000_000
+import os
+PORT = os.environ.get('TELEOP_PORT', 'COM6')
+BAUD = int(os.environ.get('TELEOP_BAUD', '1000000'))
 L1, L2 = 150.0, 150.0
 SERVO_IDS = {"pan": 1, "tilt": 2, "elbow": 3, "flex": 4, "rot": 5, "grip": 6}
 LIMITS = {

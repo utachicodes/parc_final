@@ -1395,6 +1395,116 @@ def list_available_cameras() -> list[dict]:
         cams = [{"index": 0, "width": 640, "height": 480, "deviceId": "0"}]
     return cams
 
+# ── TeleopThread ──────────────────────────────────────────────────────────────
+class TeleopThread(threading.Thread):
+    """Thread to run teleoperation scripts and capture their video output."""
+    def __init__(self, mode: str, cam_index: int = 0, port: str = None, baudrate: int = 1000000):
+        super().__init__(daemon=True)
+        self.mode = mode
+        self.cam_index = cam_index
+        self.port = port
+        self.baudrate = baudrate
+        self.running = False
+        self.frame = None
+        self.frame_lock = threading.Lock()
+        self.process = None
+        self._cap = None
+
+    def run(self):
+        self.running = True
+        teleop_dir = Path(__file__).parent.parent / "teleoperation"
+        script_map = {
+            "sign": "sign_gesture.py",
+            "onehand": "one_hand.py",
+            "twohands": "two_hands.py"
+        }
+        script = script_map.get(self.mode)
+        if not script:
+            log(f"Unknown teleop mode: {self.mode}")
+            return
+
+        script_path = teleop_dir / script
+        if not script_path.exists():
+            log(f"Teleop script not found: {script_path}")
+            return
+
+        # Get robot port from state
+        with _state_lock:
+            robot_port = self.port or state['settings'].get('port', '/dev/ttyUSB0')
+            robot_baud = state['settings'].get('baudrate', 1000000)
+
+        # Start the teleoperation script as subprocess
+        # Pass port as argument - scripts need to accept --port or similar
+        # For now, we'll modify the environment
+        env = os.environ.copy()
+        env['TELEOP_PORT'] = robot_port
+        env['TELEOP_BAUD'] = str(robot_baud)
+        # Disable GUI for headless operation
+        env['QT_QPA_PLATFORM'] = 'offscreen'
+        env['OPENCV_VIDEOIO_DEBUG'] = '1'
+
+        try:
+            self.process = subprocess.Popen(
+                [sys.executable, str(script_path)],
+                cwd=str(teleop_dir),
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            log(f"Started teleop script: {script} on port {robot_port}")
+            # Log any stderr output in a separate thread
+            def log_stderr():
+                import select
+                import io
+                import threading
+                def read_stderr():
+                    try:
+                        for line in self.process.stderr:
+                            log(f"Teleop {script} stderr: {line.decode().strip()}")
+                    except: pass
+                threading.Thread(target=read_stderr, daemon=True).start()
+            log_stderr()
+        except Exception as e:
+            log(f"Failed to start teleop script: {e}")
+
+        # Also capture camera for video feed display
+        self._cap = cv2.VideoCapture(self.cam_index)
+        if not self._cap.isOpened():
+            log(f"Failed to open camera {self.cam_index} for teleop video - trying default camera")
+            self._cap = cv2.VideoCapture(0)  # Try default
+            if not self._cap.isOpened():
+                log(f"Failed to open any camera for teleop video")
+                self.running = False
+                return
+
+        self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+
+        while self.running:
+            if self._cap and self._cap.isOpened():
+                ret, frame = self._cap.read()
+                if ret:
+                    with self.frame_lock:
+                        self.frame = frame.copy()
+            time.sleep(0.033)
+
+        if self._cap:
+            self._cap.release()
+        if self.process:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+        log(f"Teleop stopped: {self.mode}")
+
+    def stop(self):
+        self.running = False
+
+    def get_frame(self):
+        with self.frame_lock:
+            return self.frame.copy() if self.frame is not None else None
+
 # ── Global app state ──────────────────────────────────────────────────────────
 _state_lock = threading.Lock()
 _auto_port = auto_detect_port()
@@ -1407,6 +1517,7 @@ state = {
     "calibrating":     False,
     "detector":        None,
     "gripper_cam":     None,
+    "teleop":          None,
     "mode":            "idle",
     "settings": {
         "port":          _auto_port or "/dev/ttyUSB0",
@@ -2251,6 +2362,49 @@ def api_tracking_stop():
         state['tracking_active'] = False
     return jsonify({'ok': True})
 
+# ── Teleoperation ────────────────────────────────────────────────────────────
+@app.route('/api/teleop/start', methods=['POST'])
+def api_teleop_start():
+    data = request.json or {}
+    mode = data.get('mode', 'onehand')
+    cam_index = int(data.get('cam_index', 0))
+
+    with _state_lock:
+        if state['teleop']:
+            state['teleop'].stop()
+            time.sleep(0.3)
+        teleop = TeleopThread(mode, cam_index)
+        teleop.start()
+        state['teleop'] = teleop
+    return jsonify({'ok': True, 'mode': mode})
+
+@app.route('/api/teleop/stop', methods=['POST'])
+def api_teleop_stop():
+    with _state_lock:
+        if state['teleop']:
+            state['teleop'].stop()
+            state['teleop'] = None
+    return jsonify({'ok': True})
+
+@app.route('/teleop/video_feed')
+def teleop_video_feed():
+    def generate():
+        while True:
+            with _state_lock:
+                teleop = state.get('teleop')
+            if teleop and teleop.running:
+                frame = teleop.get_frame()
+                if frame is not None:
+                    import cv2
+                    _, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+                    yield b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buf.tobytes() + b'\r\n'
+                else:
+                    log("Teleop frame is None")
+            else:
+                log(f"Teleop not running: teleop={teleop}")
+            time.sleep(0.033)
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
 # ── Settings ─────────────────────────────────────────────────────────────────
 @app.route('/api/settings', methods=['POST'])
 def api_settings():
@@ -2394,7 +2548,7 @@ def api_quick_action():
     action = data.get('action')
     if not state['connected'] or not state['robot']:
         return jsonify({'ok': False, 'msg': 'Not connected'})
-    HOME = {"shoulder_pan": 0, "shoulder_lift": 0, "elbow_flex": 0,
+    HOME = {"shoulder_pan": 0, "shoulder_lift": 88, "elbow_flex": -85,
             "wrist_flex": 0, "wrist_roll": 0, "gripper": 0}
     spd = state['settings'].get('speed', 500)
     ac  = state['settings'].get('acc', 50)
@@ -2479,7 +2633,7 @@ def _execute_mode(mode_name: str):
             ("Wave L",     {**WB, "wrist_roll": -55},            0.22, 800, 65),
             ("Lower",      {**WB, "shoulder_lift": 0,
                             "elbow_flex": 20, "wrist_roll": 0},  0.4, 600, 50),
-            ("Home",       {**HOME},                              0.5, 500, 40),
+            ("Home",       {"shoulder_pan": 0, "shoulder_lift": 0, "elbow_flex": 0, "wrist_flex": 0, "wrist_roll": 0, "gripper": 60}, 0.5, 500, 40),
         ])
 
     elif mode_name == "pick_place":
@@ -2677,6 +2831,7 @@ def api_viewer_start():
             viewer_python = os.environ.get('CONDA_PYTHON_EXE') or 'python3'
             env = os.environ.copy()
             env.setdefault('DISPLAY', ':1')
+            env['SO101_DIR'] = '/home/parc/parc_final/simulation/so101-inverse-kinematics-main/so101'
             _viewer_proc = subprocess.Popen(
                 [viewer_python, str(_VIEWER_SCRIPT), '--controller', 'http://127.0.0.1:5000'],
                 cwd=str(_VIEWER_SCRIPT.parent),
