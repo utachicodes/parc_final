@@ -1,3 +1,10 @@
+import sys
+import os
+from pathlib import Path
+# Add SDK path
+SDK_PATH = Path(__file__).parent.parent / "control_arm" / "stservo-env"
+sys.path.insert(0, str(SDK_PATH))
+
 import cv2
 import mediapipe as mp
 import numpy as np

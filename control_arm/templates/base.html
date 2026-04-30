@@ -55,16 +55,16 @@
         }
 
         .prl-logo {
-            font-family: var(--dm-mono);
-            font-size: 12px;
-            font-weight: 500;
-            color: var(--amber);
-            letter-spacing: 0.04em;
-            border: 1px solid var(--amber-bdr);
-            padding: 5px 9px;
-            line-height: 1;
+            display: flex;
+            align-items: center;
             user-select: none;
-            width: fit-content;
+            text-decoration: none;
+        }
+
+        .prl-logo img {
+            height: 28px;
+            width: auto;
+            display: block;
         }
 
         .prl-conn {
@@ -318,7 +318,9 @@
 
     <!-- ── Header ──────────────────────────────────────────────────────────── -->
     <header class="prl-hdr" role="banner">
-        <div class="prl-logo" aria-label="PARC Robotics Lab">[PRL]</div>
+        <a href="/" class="prl-logo" aria-label="PARC Robotics">
+            <img src="{{ url_for('static', filename='parc-logo.png') }}" alt="PARC Robotics">
+        </a>
 
         <div class="prl-conn" role="status" aria-live="polite" aria-atomic="true">
             <span class="prl-dot" id="prl-dot" aria-hidden="true"></span>
@@ -370,16 +372,6 @@
                     </span>
                     <span class="prl-nlabel">Learn</span>
                     <span class="prl-nkbd" aria-hidden="true">L</span>
-                </a>
-            </li>
-            <li>
-                <a href="/practical" class="prl-nlink {% if _path == '/practical' %}active{% endif %}"
-                   aria-label="Practical" aria-current="{{ 'page' if _path == '/practical' else 'false' }}">
-                    <span class="prl-nico" aria-hidden="true">
-                        <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-                    </span>
-                    <span class="prl-nlabel">Practical</span>
-                    <span class="prl-nkbd" aria-hidden="true">P</span>
                 </a>
             </li>
             <li>
@@ -527,7 +519,7 @@
         document.addEventListener('keydown', ev => {
             if (ev.target.matches('input,textarea,select,[contenteditable]')) return;
             if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
-            const map = { h:'/', l:'/learn', p:'/practical', x:'/play', s:'/settings' };
+            const map = { h:'/', l:'/learn', x:'/play', s:'/settings' };
             const dest = map[ev.key.toLowerCase()];
             if (dest && dest !== window.location.pathname) { window.location.href = dest; return; }
             if (ev.key.toLowerCase() === 'm') prlLaunchViewer(ev);

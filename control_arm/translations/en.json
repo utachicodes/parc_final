@@ -24,12 +24,6 @@
       "tag1": "Courses",
       "tag2": "Tutorials"
     },
-    "practical": {
-      "title": "Practical",
-      "desc": "Hands-on programming environment with Python scripting, block-based code blocks, real-time 3D visualization, robot camera feed, and an AI assistant powered by Llama for guidance.",
-      "tag1": "Coding",
-      "tag2": "AI Assistant"
-    },
     "play": {
       "title": "Play",
       "desc": "Direct robot control interface with joint sliders, preset poses, quick actions, and real-time 3D visualization. Monitor end-effector position and execute pre-built motion modes.",
@@ -174,35 +168,6 @@
     "ai_tutor_greeting": "Hello! I'm your AI tutor. Ask me anything about robotics, kinematics, programming, or the SO-101 arm.",
     "ai_tutor_placeholder": "Ask the AI tutor..."
   },
-  "practical": {
-    "title": "Practical",
-    "code_editor": "Code Editor",
-    "robot_camera": "Robot Camera",
-    "run": "Run Code",
-    "clear": "Clear",
-    "camera_off": "Camera is off",
-    "connect_camera": "Connect Camera",
-    "disconnect_camera": "Disconnect",
-    "analyze_scene": "Analyze Scene",
-    "detect_objects": "Detect Objects",
-    "ai_greeting": "Hello! I am your AI assistant powered by LFM2.5 on your Jetson Orin Nano. Ask me about robotics, Python programming, or the SO-101 arm.",
-    "ai_placeholder": "Ask the AI assistant...",
-    "ai_connecting": "Connecting to AI server...",
-    "ai_offline": "AI server offline",
-    "ai_models": "LFM2.5 Models",
-    "vision": "Vision Analysis",
-    "vision_analyze": "Analyze Scene",
-    "voice_command": "Voice Command",
-"start_recording": "Start Recording",
-    "stop_recording": "Stop Recording",
-    "execute_command": "Execute Command",
-    "voice_settings": "Voice Settings",
-    "voice_language": "Voice Language",
-    "speak_response": "Speak Response",
-    "pieces": "Pieces & Modes",
-    "documentation": "Documentation",
-    "select_piece": "Select a piece to view documentation"
-  },
   "settings": {
     "title": "Settings",
     "subtitle": "Configure your preferences",
@@ -293,8 +258,6 @@
       "failed_to_preview_voice": "Failed to preview voice",
       "failed_to_download_voice": "Failed to download voice",
       "connection_failed": "Connection failed",
-      "code_executed_successfully": "Code executed successfully",
-      "failed_to_execute_code": "Failed to execute code",
       "error_occurred": "Error occurred",
       "camera_access_denied": "Camera access denied",
       "camera_not_connected": "Camera not connected",
@@ -303,7 +266,6 @@
       "ik_solution_applied": "IK solution applied",
       "robot_reset": "Robot reset to zero position",
       "connected_to_robot": "Connected to robot",
-      "command_added_to_editor": "Command added to code editor",
       "voice_downloaded_successfully": "Voice downloaded successfully"
     },
     "calibration": {

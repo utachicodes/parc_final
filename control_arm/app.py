@@ -5,11 +5,14 @@ Run: python app.py  →  http://localhost:5000
 import sys, os, time, threading, queue, json, subprocess, signal
 from pathlib import Path
 SDK_PATH = Path(__file__).parent / "stservo-env"
+if not SDK_PATH.exists():
+    SDK_PATH = Path(__file__).parent / "STServo_Python"
 sys.path.insert(0, str(SDK_PATH))
 
 import numpy as np
 import cv2
 from flask import Flask, Response, render_template, request, jsonify, stream_with_context
+import serial.tools.list_ports
 from scservo_sdk import PortHandler, sms_sts, COMM_SUCCESS
 
 # ── logging (SSE broadcast) ───────────────────────────────────────────────────
@@ -1346,12 +1349,18 @@ class TrackerThread(threading.Thread):
 
 # ── Port auto-detection ──────────────────────────────────────────────────
 def auto_detect_port() -> str | None:
-    import glob
-    ports = sorted(glob.glob('/dev/ttyUSB*') + glob.glob('/dev/ttyACM*'))
+    ports = list(serial.tools.list_ports.comports())
     for p in ports:
-        if os.path.exists(p):
-            log(f"Auto-detected port: {p}")
-            return p
+        # Check for typical USB-Serial descriptors
+        if "USB" in p.description.upper() or "SERIAL" in p.description.upper() or "ACM" in p.device.upper() or "USB" in p.device.upper():
+            log(f"Auto-detected port: {p.device} ({p.description})")
+            return p.device
+    
+    # Fallback to first available port if none matched the description
+    if ports:
+        log(f"Falling back to first available port: {ports[0].device}")
+        return ports[0].device
+        
     return None
 
 def auto_detect_camera() -> int:
@@ -1724,13 +1733,6 @@ def learn():
                            en_json=_translations.get("en", {}),
                            fr_json=_translations.get("fr", {}))
 
-@app.route('/practical')
-def practical():
-    return render_template('pages/practical.html',
-                           lang=_current_lang,
-                           en_json=_translations.get("en", {}),
-                           fr_json=_translations.get("fr", {}))
-
 @app.route('/play')
 def play():
     return render_template('pages/play.html',
@@ -1746,6 +1748,13 @@ def settings():
                            fr_json=_translations.get("fr", {}))
 
 # ── Language ───────────────────────────────────────────────────────────────────
+@app.before_request
+def read_lang_cookie():
+    global _current_lang
+    lang = request.cookies.get('lang', 'en')
+    if lang in _translations:
+        _current_lang = lang
+
 @app.route('/api/lang', methods=['GET', 'POST'])
 def api_lang():
     global _current_lang
@@ -2737,18 +2746,6 @@ from llama_integration import (
 # Setup all AI routes
 setup_ai_routes(app)
 
-# ── Practical Code Runner ──────────────────────────────────────────────────────
-@app.route('/api/practical/run', methods=['POST'])
-def api_practical_run():
-    data = request.json or {}
-    code = data.get('code', '')
-    # Note: Code execution should be done in a sandboxed environment
-    # For now, return success as placeholder
-    return jsonify({
-        'success': True,
-        'output': 'Code execution placeholder - implement sandboxed execution for production.'
-    })
-
 # ── Simulation server process ─────────────────────────────────────────────────
 _SIM_SERVER = Path(__file__).parent.parent / "simulation" / "server.py"
 _SIM_HTTP_PORT = int(os.environ.get("SIM_HTTP_PORT", 38000))
@@ -2831,7 +2828,7 @@ def api_viewer_start():
             viewer_python = os.environ.get('CONDA_PYTHON_EXE') or 'python3'
             env = os.environ.copy()
             env.setdefault('DISPLAY', ':1')
-            env['SO101_DIR'] = '/home/parc/parc_final/simulation/so101-inverse-kinematics-main/so101'
+            env['SO101_DIR'] = str(Path(__file__).parent.parent / 'simulation' / 'so101-inverse-kinematics-main' / 'so101')
             _viewer_proc = subprocess.Popen(
                 [viewer_python, str(_VIEWER_SCRIPT), '--controller', 'http://127.0.0.1:5000'],
                 cwd=str(_VIEWER_SCRIPT.parent),
